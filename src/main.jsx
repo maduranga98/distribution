@@ -3,9 +3,11 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./index.css";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { BusinessProvider, useBusiness } from "./context/BusinessContext";
 import { DataProvider } from "./context/DataContext";
 import Layout from "./components/Layout";
 import { Spinner } from "./components/ui";
+import FirstBusiness from "./pages/FirstBusiness";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Sales from "./pages/Sales";
@@ -19,7 +21,18 @@ function Gate() {
   if (user === undefined) return <Spinner />;
   if (!user) return <Login />;
   return (
-    <DataProvider>
+    <BusinessProvider>
+      <Shell />
+    </BusinessProvider>
+  );
+}
+
+function Shell() {
+  const { current, loading } = useBusiness();
+  if (loading) return <Spinner />;
+  if (!current) return <FirstBusiness />;
+  return (
+    <DataProvider key={current.id}>
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Dashboard />} />

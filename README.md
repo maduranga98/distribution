@@ -19,6 +19,6 @@ npm run build && firebase deploy --only hosting,firestore
 ```
 
 ## Data model
-Everything lives under `users/{uid}/…` (`products`, `customers`, `sales`, `payments`,
+Each business lives under `users/{uid}/businesses/{businessId}/…` (`products`, `customers`, `sales`, `payments`,
 `expenses`, `movements`); rules in `firestore.rules` restrict each user to their own data.
 Sales snapshot cost price per item, so historical profit stays correct when costs change.

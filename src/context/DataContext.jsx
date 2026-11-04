@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { useBusiness } from "./BusinessContext";
 import { useAuth } from "./AuthContext";
 
 const Ctx = createContext(null);
@@ -10,13 +11,15 @@ const NAMES = ["products", "customers", "sales", "expenses", "payments", "moveme
 
 export function DataProvider({ children }) {
   const { user } = useAuth();
+  const { current } = useBusiness();
+  const base = `${user.uid}/businesses/${current.id}`;
   const [data, setData] = useState({});
   const [ready, setReady] = useState({});
 
   useEffect(() => {
     const unsubs = NAMES.map((name) =>
       onSnapshot(
-        query(collection(db, "users", user.uid, name), orderBy("createdAt", "desc")),
+        query(collection(db, `users/${base}/${name}`), orderBy("createdAt", "desc")),
         (snap) => {
           setData((d) => ({ ...d, [name]: snap.docs.map((x) => ({ id: x.id, ...x.data() })) }));
           setReady((r) => ({ ...r, [name]: true }));
@@ -25,17 +28,17 @@ export function DataProvider({ children }) {
       )
     );
     return () => unsubs.forEach((u) => u());
-  }, [user.uid]);
+  }, [base]);
 
   const value = useMemo(() => {
     const g = (n) => data[n] || [];
     return {
-      uid: user.uid,
+      uid: base, // data path prefix for the active business
       loading: NAMES.some((n) => !ready[n]),
       products: g("products"), customers: g("customers"), sales: g("sales"),
       expenses: g("expenses"), payments: g("payments"), movements: g("movements"),
     };
-  }, [data, ready, user.uid]);
+  }, [data, ready, base]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
