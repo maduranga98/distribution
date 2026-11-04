@@ -8,11 +8,11 @@ import { stockValue } from "../lib/accounts";
 
 function ProductForm({ product, onClose }) {
   const { uid } = useData();
-  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", cost: "", price: "", minStock: "", stock: "", ...product });
+  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", cost: "", price: "", specialPrice: "", minStock: "", stock: "", ...product });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = async (e) => {
     e.preventDefault();
-    const data = { name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", cost: num(f.cost), price: num(f.price), minStock: num(f.minStock) };
+    const data = { name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", cost: num(f.cost), price: num(f.price), specialPrice: num(f.specialPrice), minStock: num(f.minStock) };
     if (product) await update(uid, "products", product.id, data);
     else await add(uid, "products", { ...data, stock: num(f.stock) });
     onClose();
@@ -25,6 +25,7 @@ function ProductForm({ product, onClose }) {
         <Field label="Unit"><input className="input" value={f.unit} onChange={set("unit")} /></Field>
         <Field label="Cost price"><input className="input" type="number" step="any" min="0" required value={f.cost} onChange={set("cost")} /></Field>
         <Field label="Selling price"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>
+        <Field label="Special price (optional)"><input className="input" type="number" step="any" min="0" value={f.specialPrice} onChange={set("specialPrice")} /></Field>
         {!product && <Field label="Opening stock"><input className="input" type="number" step="any" min="0" value={f.stock} onChange={set("stock")} /></Field>}
         <Field label="Low-stock alert at"><input className="input" type="number" step="any" min="0" value={f.minStock} onChange={set("minStock")} /></Field>
         <button className="btn-primary col-span-2 mt-2">Save</button>

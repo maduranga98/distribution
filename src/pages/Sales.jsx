@@ -124,8 +124,9 @@ export default function Sales() {
                   <td className="td text-right">{money(s.total)}</td>
                   <td className="td text-right">{s.paid >= s.total ? <Badge tone="green">Paid</Badge> : <Badge tone="red">Owes {money(s.total - s.paid)}</Badge>}</td>
                   <td className="td text-right">
-                    <button className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Delete & restock"
-                      onClick={() => confirm("Delete this sale and return items to stock?") && deleteSale(d.uid, s)}><Trash2 size={15} /></button>
+                    {s.runId ? <span className="text-xs text-neutral-400">Route</span> : (
+                      <button className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Delete & restock"
+                        onClick={() => confirm("Delete this sale and return items to stock?") && deleteSale(d.uid, s)}><Trash2 size={15} /></button>)}
                   </td>
                 </tr>
               ))}
