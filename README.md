@@ -7,7 +7,7 @@ line items, cash/credit, atomic stock deduction · customers & credit balances /
 expenses by category · accounts (P&L, cash flow, stock value, receivables) · dashboard.
 
 ## Setup
-1. Create a Firebase project; enable **Authentication → Email/Password** and **Firestore**.
+1. Create a Firebase project; enable **Authentication → Google** sign-in and **Firestore**.
 2. Add a web app and copy its config into `.env` (see `.env.example`).
 3. `npm install && npm run dev`
 
