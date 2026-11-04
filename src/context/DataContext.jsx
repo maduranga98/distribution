@@ -7,7 +7,7 @@ import { OWNER } from "../lib/utils";
 const Ctx = createContext(null);
 export const useData = () => useContext(Ctx);
 
-const NAMES = ["products", "customers", "sales", "expenses", "payments", "movements"];
+const NAMES = ["products", "customers", "sales", "expenses", "payments", "movements", "routes", "runs"];
 
 export function DataProvider({ children }) {
   const { current } = useBusiness();
@@ -35,7 +35,7 @@ export function DataProvider({ children }) {
       uid: base, // data path prefix for the active business
       loading: NAMES.some((n) => !ready[n]),
       products: g("products"), customers: g("customers"), sales: g("sales"),
-      expenses: g("expenses"), payments: g("payments"), movements: g("movements"),
+      expenses: g("expenses"), payments: g("payments"), movements: g("movements"), routes: g("routes"), runs: g("runs"),
     };
   }, [data, ready, base]);
 

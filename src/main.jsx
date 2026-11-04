@@ -13,6 +13,7 @@ import Stock from "./pages/Stock";
 import Customers from "./pages/Customers";
 import Expenses from "./pages/Expenses";
 import Accounting from "./pages/Accounting";
+import RoutesPage from "./pages/Routes";
 
 function Shell() {
   const { current, loading } = useBusiness();
@@ -24,6 +25,7 @@ function Shell() {
         <Route element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="sales" element={<Sales />} />
+          <Route path="routes" element={<RoutesPage />} />
           <Route path="stock" element={<Stock />} />
           <Route path="customers" element={<Customers />} />
           <Route path="expenses" element={<Expenses />} />
