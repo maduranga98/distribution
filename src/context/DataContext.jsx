@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useBusiness } from "./BusinessContext";
-import { useAuth } from "./AuthContext";
+import { OWNER } from "../lib/utils";
 
 const Ctx = createContext(null);
 export const useData = () => useContext(Ctx);
@@ -10,9 +10,8 @@ export const useData = () => useContext(Ctx);
 const NAMES = ["products", "customers", "sales", "expenses", "payments", "movements"];
 
 export function DataProvider({ children }) {
-  const { user } = useAuth();
   const { current } = useBusiness();
-  const base = `${user.uid}/businesses/${current.id}`;
+  const base = `${OWNER}/businesses/${current.id}`;
   const [data, setData] = useState({});
   const [ready, setReady] = useState({});
 

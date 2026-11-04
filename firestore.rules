@@ -1,9 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Each user can only access their own business data.
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    // No login: the app reads/writes one fixed path. Anyone who knows the
+    // project config can access it, so keep the site URL private.
+    match /users/owner/{document=**} {
+      allow read, write: if true;
     }
   }
 }

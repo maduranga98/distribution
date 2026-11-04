@@ -1,3 +1,5 @@
+// Single fixed owner path (no login).
+export const OWNER = "owner";
 export const today = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD local
 export const monthStart = (d = today()) => d.slice(0, 8) + "01";
 

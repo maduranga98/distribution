@@ -1,7 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { signOut } from "firebase/auth";
-import { BarChart3, Boxes, LayoutDashboard, LogOut, Receipt, ShoppingCart, Users, Wallet } from "lucide-react";
-import { auth } from "../lib/firebase";
+import { BarChart3, Boxes, LayoutDashboard, Receipt, ShoppingCart, Users, Wallet } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { Spinner } from "./ui";
 import BusinessSwitcher from "./BusinessSwitcher";
@@ -31,7 +29,6 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <button onClick={() => signOut(auth)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-neutral-500 hover:bg-neutral-100"><LogOut size={16} />Sign out</button>
       </aside>
 
       <main className="min-w-0 flex-1 p-4 pb-24 md:p-8">
