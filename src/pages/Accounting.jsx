@@ -33,7 +33,7 @@ export default function Accounting() {
           <Row label="Sale value (sold × price)" value={s.gross} />
           <Row label="Market returns" value={-s.marketReturns} indent />
           <Row label="Net sales" value={s.revenue} bold />
-          <Row label="Cost of goods sold" value={-s.cogs} indent />
+          <Row label="Goods sold (at MRP)" value={-s.cogs} indent />
           <Row label="Gross profit" value={s.grossProfit} bold />
           {Object.entries(byCategory).map(([k, v]) => <Row key={k} label={k} value={-v} indent />)}
           <Row label="Total expenses" value={-s.expenses} />
@@ -50,7 +50,7 @@ export default function Accounting() {
 
       <p className="mb-2 mt-6 text-sm font-medium">Position today</p>
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Stock value (at cost)" value={money(stockValue(d.products))} />
+        <Stat label="Stock value (at MRP)" value={money(stockValue(d.products))} />
         <Stat label="Loadings in period" value={s.runCount} />
       </div>
     </>

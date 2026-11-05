@@ -168,7 +168,7 @@ function UnloadForm({ run, onClose }) {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-neutral-400">Sold = Loaded − Unloaded (unloaded goes back to the warehouse). Market return = goods taken back from shops; valued at the selling price and deducted from sales (not restocked).</p>
+        <p className="text-xs text-neutral-400">Sold = Loaded − Unloaded (unloaded goes back to the warehouse). Market return = goods taken back from shops; valued at the retail price and deducted from sales (not restocked).</p>
 
         <div className="grid grid-cols-3 gap-2 rounded-lg bg-neutral-50 p-3 text-center text-sm">
           <div><p className="text-xs text-neutral-500">Sale value</p><p className="font-medium">{money(calc.gross)}</p></div>

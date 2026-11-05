@@ -26,7 +26,7 @@ export async function adjustStock(base, m) {
 }
 
 /**
- * GRN: receive stock into inventory. Each line carries the cost and the selling price chosen
+ * GRN: receive stock into inventory. Each line carries the MRP and the retail price chosen
  * in the price selector; the product's price only changes (and is remembered) if it differs.
  */
 export async function createGrn(base, grn) {
