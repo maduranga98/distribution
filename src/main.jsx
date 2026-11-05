@@ -8,12 +8,10 @@ import Layout from "./components/Layout";
 import { Spinner } from "./components/ui";
 import FirstBusiness from "./pages/FirstBusiness";
 import Dashboard from "./pages/Dashboard";
-import Sales from "./pages/Sales";
 import Stock from "./pages/Stock";
-import Customers from "./pages/Customers";
 import Expenses from "./pages/Expenses";
 import Accounting from "./pages/Accounting";
-import RoutesPage from "./pages/Routes";
+import Daily from "./pages/Daily";
 
 function Shell() {
   const { current, loading } = useBusiness();
@@ -24,10 +22,9 @@ function Shell() {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Dashboard />} />
-          <Route path="sales" element={<Sales />} />
-          <Route path="routes" element={<RoutesPage />} />
+          <Route path="daily" element={<Daily />} />
+          <Route path="routes" element={<Navigate to="/daily" />} />
           <Route path="stock" element={<Stock />} />
-          <Route path="customers" element={<Customers />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="accounting" element={<Accounting />} />
           <Route path="*" element={<Navigate to="/" />} />

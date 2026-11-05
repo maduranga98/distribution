@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, MapPin, PackageCheck, PackageMinus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Boxes, ChevronDown, MapPin, PackageCheck, PackageMinus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useData } from "../context/DataContext";
-import { add, cancelRun, closeRun, loadRun, remove, update } from "../lib/db";
+import { add, cancelLoading, remove, saveLoading, saveUnloading, update } from "../lib/db";
 import { calcRun } from "../lib/runs";
 import { cn, money, num, sum, today } from "../lib/utils";
 import { Badge, Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
+import StockTable from "../components/StockTable";
 
 function RouteForm({ route, onClose }) {
   const { uid } = useData();
@@ -55,16 +56,21 @@ function ManageRoutes({ onClose }) {
   );
 }
 
-function LoadForm({ date, onClose }) {
+/** Morning loading. With `run` it edits a saved loading; stock moves by the difference. */
+function LoadForm({ date, run, onClose }) {
   const { uid, routes, products, runs } = useData();
-  const [d, setD] = useState(date);
-  const [routeId, setRouteId] = useState(routes[0]?.id || "");
-  const [qty, setQty] = useState({});
+  const [d, setD] = useState(run?.date || date);
+  const [routeId, setRouteId] = useState(run?.routeId || routes[0]?.id || "");
+  const old = useMemo(() => Object.fromEntries((run?.items || []).map((i) => [i.productId, i])), [run]);
+  const [qty, setQty] = useState(() => Object.fromEntries((run?.items || []).map((i) => [i.productId, String(i.loaded)])));
   const [q, setQ] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const route = routes.find((r) => r.id === routeId);
-  const visit = runs.filter((r) => r.routeId === routeId && r.date === d).length + 1;
+  const visit = run && routeId === run.routeId && d === run.date ? run.visit
+    : runs.filter((r) => r.routeId === routeId && r.date === d && r.id !== run?.id).length + 1;
+  const room = (p) => p.stock + (old[p.id]?.loaded || 0); // what can still be loaded
+  const priceOf = (p) => old[p.id]?.price ?? p.price; // loaded lines keep their saved price
   const list = products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
   const picked = products.filter((p) => num(qty[p.id]) > 0);
 
@@ -72,18 +78,20 @@ function LoadForm({ date, onClose }) {
     e.preventDefault();
     if (!route) return setError("Create a route first");
     if (!picked.length) return setError("Enter a loaded quantity for at least one item");
+    const over = picked.find((p) => num(qty[p.id]) > room(p));
+    if (over) return setError(`Not enough stock for "${over.name}" (available ${room(over)})`);
     setBusy(true); setError("");
     try {
-      await loadRun(uid, {
+      await saveLoading(uid, {
         date: d, routeId, routeName: route.name, visit,
-        items: picked.map((p) => ({ productId: p.id, name: p.name, unit: p.unit, loaded: num(qty[p.id]), price: p.price, specialPrice: p.specialPrice || 0, cost: p.cost })),
-      });
+        items: picked.map((p) => ({ productId: p.id, name: p.name, unit: p.unit, loaded: num(qty[p.id]), price: priceOf(p), cost: old[p.id]?.cost ?? p.cost })),
+      }, run?.id);
       onClose();
     } catch (err) { setError(err.message); setBusy(false); }
   };
 
   return (
-    <Modal title="Load route" onClose={onClose} wide>
+    <Modal title={run ? "Edit loading" : "Load route"} onClose={onClose} wide>
       <form onSubmit={save} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Date"><input type="date" className="input" required value={d} onChange={(e) => setD(e.target.value)} /></Field>
@@ -98,8 +106,8 @@ function LoadForm({ date, onClose }) {
         <div className="max-h-[45vh] divide-y divide-neutral-100 overflow-y-auto rounded-lg border border-neutral-200">
           {list.map((p) => (
             <div key={p.id} className="flex items-center gap-3 px-3 py-2">
-              <div className="min-w-0 flex-1"><div className="truncate text-sm">{p.name}</div><div className="text-xs text-neutral-400">{p.stock} in warehouse</div></div>
-              <input className={cn("input !w-24 text-right", num(qty[p.id]) > p.stock && "!border-red-400")} type="number" min="0" max={p.stock} step="any" placeholder="0"
+              <div className="min-w-0 flex-1"><div className="truncate text-sm">{p.name}</div><div className="text-xs text-neutral-400">{room(p)} {p.unit} available · price {money(priceOf(p))}</div></div>
+              <input className={cn("input !w-24 text-right", num(qty[p.id]) > room(p) && "!border-red-400")} type="number" min="0" step="any" placeholder="0"
                 value={qty[p.id] ?? ""} onChange={(e) => setQty({ ...qty, [p.id]: e.target.value })} />
             </div>
           ))}
@@ -107,106 +115,97 @@ function LoadForm({ date, onClose }) {
         </div>
         <div className="flex items-center justify-between text-sm text-neutral-500">
           <span>{picked.length} items · {sum(picked, (p) => num(qty[p.id]))} pcs</span>
-          <span>Value at list price {money(sum(picked, (p) => num(qty[p.id]) * p.price))}</span>
+          <span>Value {money(sum(picked, (p) => num(qty[p.id]) * priceOf(p)))}</span>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="btn-primary w-full" disabled={busy}>Load onto vehicle</button>
+        <button className="btn-primary w-full" disabled={busy}>{run ? "Save changes" : "Save loading"}</button>
       </form>
     </Modal>
   );
 }
 
+/** Evening unloading: leftover qty + optional market returns. Also edits a saved unloading. */
 function UnloadForm({ run, onClose }) {
   const { uid } = useData();
-  const [v, setV] = useState({});
-  const [cash, setCash] = useState("");
-  const [cheque, setCheque] = useState("");
+  const [v, setV] = useState(() => Object.fromEntries(run.items.map((i) => [i.productId, { returned: i.returned ? String(i.returned) : "", marketReturn: i.marketReturn ? String(i.marketReturn) : "" }])));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const lines = useMemo(() => Object.fromEntries(run.items.map((i) => [i.productId, v[i.productId] || {}])), [run, v]);
-  const calc = calcRun(run.items.map((i) => ({ ...i, ...lines[i.productId] })));
-  const paid = num(cash) + num(cheque);
-  const credit = calc.sales - paid;
+  const calc = calcRun(run.items.map((i) => ({ ...i, ...v[i.productId] })));
   const set = (id, k, val) => setV({ ...v, [id]: { ...v[id], [k]: val } });
 
   const save = async (e) => {
     e.preventDefault();
     if (calc.error) return setError(calc.error);
     setBusy(true); setError("");
-    try { await closeRun(uid, run.id, lines, { cash: num(cash), cheque: num(cheque) }); onClose(); }
-    catch (err) { setError(err.message); setBusy(false); }
+    try {
+      await saveUnloading(uid, run.id, Object.fromEntries(Object.entries(v).map(([id, x]) => [id, { returned: num(x.returned), marketReturn: num(x.marketReturn) }])));
+      onClose();
+    } catch (err) { setError(err.message); setBusy(false); }
   };
-  const cols = [["returned", "Returned"], ["free", "Free"], ["specialQty", "Special"], ["marketReturns", "Mkt ret."]];
+  const num2 = "input !w-20 !px-2 !py-1 text-right";
 
   return (
-    <Modal title={`Unload · ${run.routeName}`} onClose={onClose} wide>
+    <Modal title={`${run.status === "loaded" ? "Unload" : "Edit unloading"} · ${run.routeName}`} onClose={onClose} wide>
       <form onSubmit={save} className="space-y-4">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px]">
             <thead><tr>
-              <th className="th !px-2">Item</th><th className="th !px-2 text-right">Loaded</th>
-              {cols.map(([, l]) => <th key={l} className="th !px-1 text-right">{l}</th>)}
-              <th className="th !px-2 text-right">Sold</th>
+              <th className="th !px-2">Item</th><th className="th !px-2 text-right">Price</th><th className="th !px-2 text-right">Loaded</th>
+              <th className="th !px-1 text-right">Unloaded</th><th className="th !px-2 text-right">Sold</th>
+              <th className="th !px-1 text-right">Market return</th><th className="th !px-2 text-right">Net</th>
             </tr></thead>
             <tbody className="divide-y divide-neutral-100">
               {calc.rows.map((r) => (
                 <tr key={r.productId}>
                   <td className="td !px-2 !py-1.5">{r.name}</td>
+                  <td className="td !px-2 !py-1.5 text-right text-neutral-500">{money(r.price)}</td>
                   <td className="td !px-2 !py-1.5 text-right text-neutral-500">{r.loaded}</td>
-                  {cols.map(([k]) => (
-                    <td key={k} className="!px-1 !py-1.5">
-                      <input className="input !w-16 !px-2 !py-1 text-right" type="number" min="0" step="any" placeholder="0"
-                        value={v[r.productId]?.[k] ?? ""} onChange={(e) => set(r.productId, k, e.target.value)} />
-                    </td>
-                  ))}
+                  <td className="!px-1 !py-1.5"><input className={num2} type="number" min="0" step="any" placeholder="0" value={v[r.productId].returned} onChange={(e) => set(r.productId, "returned", e.target.value)} /></td>
                   <td className={cn("td !px-2 !py-1.5 text-right font-medium", r.error && "text-red-600")}>{r.sold}</td>
+                  <td className="!px-1 !py-1.5"><input className={num2} type="number" min="0" step="any" placeholder="0" value={v[r.productId].marketReturn} onChange={(e) => set(r.productId, "marketReturn", e.target.value)} /></td>
+                  <td className="td !px-2 !py-1.5 text-right">{money(r.sales)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-neutral-400">Sold = Loaded − Returned − Free. Special = qty sold at special price. Mkt ret. = returns taken back from shops (deducted from sales value, not restocked).</p>
+        <p className="text-xs text-neutral-400">Sold = Loaded − Unloaded (unloaded goes back to the warehouse). Market return = goods taken back from shops; valued at the selling price and deducted from sales (not restocked).</p>
 
         <div className="grid grid-cols-3 gap-2 rounded-lg bg-neutral-50 p-3 text-center text-sm">
-          <div><p className="text-xs text-neutral-500">Gross</p><p className="font-medium">{money(calc.gross)}</p></div>
-          <div><p className="text-xs text-neutral-500">Deductions</p><p className="font-medium">−{money(calc.concession + calc.marketValue)}</p></div>
-          <div><p className="text-xs text-neutral-500">Sales value</p><p className="font-semibold">{money(calc.sales)}</p></div>
-        </div>
-
-        <div className="grid grid-cols-3 items-end gap-3">
-          <Field label="Cash collected"><input className="input" type="number" min="0" step="any" value={cash} onChange={(e) => setCash(e.target.value)} /></Field>
-          <Field label="Cheques"><input className="input" type="number" min="0" step="any" value={cheque} onChange={(e) => setCheque(e.target.value)} /></Field>
-          <div className="pb-2 text-right"><p className="text-xs text-neutral-500">Credit</p><p className={cn("font-semibold", credit < 0 && "text-red-600")}>{money(credit)}</p></div>
+          <div><p className="text-xs text-neutral-500">Sale value</p><p className="font-medium">{money(calc.gross)}</p></div>
+          <div><p className="text-xs text-neutral-500">Market returns</p><p className="font-medium">−{money(calc.marketValue)}</p></div>
+          <div><p className="text-xs text-neutral-500">Net sale</p><p className="font-semibold">{money(calc.sales)}</p></div>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="btn-primary w-full" disabled={busy || !!calc.error || credit < -0.005}>Close run & update stock</button>
+        <button className="btn-primary w-full" disabled={busy || !!calc.error}>{run.status === "loaded" ? "Save unloading" : "Save changes"}</button>
       </form>
     </Modal>
   );
 }
 
-function RunCard({ run, onUnload }) {
+function RunCard({ run, onEdit, onUnload }) {
   const { uid } = useData();
   const [open, setOpen] = useState(false);
-  const closed = run.status === "closed";
-  const pcs = sum(run.items, (i) => i.loaded);
+  const done = run.status !== "loaded";
   return (
     <div className="card">
-      <div className="flex items-center gap-3 p-4">
+      <div className="flex flex-wrap items-center gap-3 p-4">
         <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(!open)}>
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{run.routeName}</span>
             {run.visit > 1 && <span className="text-xs text-neutral-400">visit {run.visit}</span>}
-            <Badge tone={closed ? "green" : "amber"}>{closed ? "Closed" : "On the road"}</Badge>
+            <Badge tone={done ? "green" : "amber"}>{done ? "Unloaded" : "On the road"}</Badge>
           </div>
           <p className="mt-0.5 text-xs text-neutral-500">
-            {run.items.length} items · {pcs} pcs loaded{closed && ` · sales ${money(run.totals.sales)} · cash ${money(run.collections.cash)}${run.collections.credit > 0.005 ? ` · credit ${money(run.collections.credit)}` : ""}`}
+            {run.items.length} items · {sum(run.items, (i) => i.loaded)} pcs loaded
+            {done && ` · sold ${run.totals.sold} pcs · market returns ${money(run.totals.marketValue)} · net sale ${money(run.totals.sales)}`}
           </p>
         </button>
-        {!closed && <>
+        <button className="btn-ghost" onClick={onEdit}><Pencil size={15} />{done ? "Edit unloading" : "Edit loading"}</button>
+        {!done && <>
           <button className="btn-primary" onClick={onUnload}><PackageCheck size={16} />Unload</button>
-          <button className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Cancel run & restock"
-            onClick={() => confirm("Cancel this run and return everything to the warehouse?") && cancelRun(uid, run)}><Trash2 size={15} /></button>
+          <button className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Cancel loading & restock"
+            onClick={() => confirm("Cancel this loading and return everything to the warehouse?") && cancelLoading(uid, run)}><Trash2 size={15} /></button>
         </>}
         <ChevronDown size={16} className={cn("text-neutral-400 transition", open && "rotate-180")} />
       </div>
@@ -214,14 +213,14 @@ function RunCard({ run, onUnload }) {
         <div className="overflow-x-auto border-t border-neutral-100">
           <table className="w-full">
             <thead><tr>
-              <th className="th">Item</th><th className="th text-right">Loaded</th>
-              {closed && <><th className="th text-right">Returned</th><th className="th text-right">Free</th><th className="th text-right">Sold</th><th className="th text-right">Sales</th></>}
+              <th className="th">Item</th><th className="th text-right">Price</th><th className="th text-right">Loaded</th>
+              {done && <><th className="th text-right">Unloaded</th><th className="th text-right">Sold</th><th className="th text-right">Mkt return</th><th className="th text-right">Net</th></>}
             </tr></thead>
             <tbody className="divide-y divide-neutral-100">
               {run.items.map((i) => (
                 <tr key={i.productId}>
-                  <td className="td">{i.name}</td><td className="td text-right">{i.loaded}</td>
-                  {closed && <><td className="td text-right">{i.returned || 0}</td><td className="td text-right">{i.free || 0}</td><td className="td text-right">{i.sold}</td><td className="td text-right">{money(i.sales)}</td></>}
+                  <td className="td">{i.name}</td><td className="td text-right">{money(i.price)}</td><td className="td text-right">{i.loaded}</td>
+                  {done && <><td className="td text-right">{i.returned || 0}</td><td className="td text-right">{i.sold}</td><td className="td text-right">{i.marketReturn || 0}</td><td className="td text-right">{money(i.sales)}</td></>}
                 </tr>
               ))}
             </tbody>
@@ -232,37 +231,47 @@ function RunCard({ run, onUnload }) {
   );
 }
 
-export default function RoutesPage() {
-  const { runs } = useData();
+export default function Daily() {
+  const { runs, products } = useData();
   const [date, setDate] = useState(today());
   const [modal, setModal] = useState(null);
   const list = runs.filter((r) => r.date === date);
-  const closed = list.filter((r) => r.status === "closed");
+  const done = list.filter((r) => r.status !== "loaded");
+  const t = (k) => sum(done, (r) => r.totals?.[k] || 0);
 
   return (
     <>
-      <PageHeader title="Routes" subtitle="Daily loading & unloading">
+      <PageHeader title="Daily" subtitle="Loading, unloading & sales">
         <input type="date" className="input !w-40" value={date} onChange={(e) => setDate(e.target.value || today())} />
+        <button className="btn-ghost" onClick={() => setModal({ t: "stock" })}><Boxes size={16} />Current stock</button>
         <button className="btn-ghost" onClick={() => setModal({ t: "routes" })}><MapPin size={16} />Routes</button>
         <button className="btn-primary" onClick={() => setModal({ t: "load" })}><PackageMinus size={16} />Load route</button>
       </PageHeader>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Runs" value={list.length} hint={`${list.length - closed.length} on the road`} />
-        <Stat label="Pcs loaded" value={sum(list, (r) => sum(r.items, (i) => i.loaded))} />
-        <Stat label="Sales" value={money(sum(closed, (r) => r.totals.sales))} />
-        <Stat label="Cash + cheques" value={money(sum(closed, (r) => r.collections.cash + r.collections.cheque))} tone="good" />
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <Stat label="Loadings" value={list.length} hint={`${list.length - done.length} on the road`} />
+        <Stat label="Qty sold" value={t("sold")} hint="loaded − unloaded" />
+        <Stat label="Sale value" value={money(t("gross"))} />
+        <Stat label="Market returns" value={`−${money(t("marketValue"))}`} tone={t("marketValue") ? "bad" : undefined} />
+        <Stat label="Net sale" value={money(t("sales"))} tone="good" />
       </div>
 
       <div className="space-y-3">
         {list.length === 0
-          ? <div className="card"><Empty><MapPin className="mx-auto mb-2" />No runs on this day</Empty></div>
-          : list.map((r) => <RunCard key={r.id} run={r} onUnload={() => setModal({ t: "unload", run: r })} />)}
+          ? <div className="card"><Empty><MapPin className="mx-auto mb-2" />No loadings on this day</Empty></div>
+          : list.map((r) => <RunCard key={r.id} run={r}
+              onEdit={() => setModal(r.status === "loaded" ? { t: "load", run: r } : { t: "unload", run: r })}
+              onUnload={() => setModal({ t: "unload", run: r })} />)}
       </div>
 
       {modal?.t === "routes" && <ManageRoutes onClose={() => setModal(null)} />}
-      {modal?.t === "load" && <LoadForm date={date} onClose={() => setModal(null)} />}
+      {modal?.t === "load" && <LoadForm date={date} run={modal.run} onClose={() => setModal(null)} />}
       {modal?.t === "unload" && <UnloadForm run={modal.run} onClose={() => setModal(null)} />}
+      {modal?.t === "stock" && (
+        <Modal title="Current stock" onClose={() => setModal(null)} wide>
+          <div className="overflow-x-auto"><StockTable products={products} /></div>
+        </Modal>
+      )}
     </>
   );
 }

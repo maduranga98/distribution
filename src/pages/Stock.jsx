@@ -1,20 +1,21 @@
 import { useState } from "react";
-import { Package, Pencil, Plus, Trash2, Truck } from "lucide-react";
+import { ClipboardList, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useData } from "../context/DataContext";
-import { add, addStockMovement, deleteProduct, update } from "../lib/db";
-import { money, num, today } from "../lib/utils";
-import { Badge, Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
-import { stockValue } from "../lib/accounts";
+import { add, adjustStock, createGrn, deleteGrn, deleteProduct, update } from "../lib/db";
+import { onVehicle, stockValue } from "../lib/accounts";
+import { cn, money, num, sum, today } from "../lib/utils";
+import { Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
+import StockTable from "../components/StockTable";
 
 function ProductForm({ product, onClose }) {
   const { uid } = useData();
-  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", cost: "", price: "", specialPrice: "", minStock: "", stock: "", ...product });
+  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", cost: "", price: "", minStock: "", stock: "", ...product });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = async (e) => {
     e.preventDefault();
-    const data = { name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", cost: num(f.cost), price: num(f.price), specialPrice: num(f.specialPrice), minStock: num(f.minStock) };
-    if (product) await update(uid, "products", product.id, data);
-    else await add(uid, "products", { ...data, stock: num(f.stock) });
+    const data = { name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", cost: num(f.cost), minStock: num(f.minStock) };
+    if (product) await update(uid, "products", product.id, data); // price changes go through GRN
+    else await add(uid, "products", { ...data, price: num(f.price), priceHistory: [], stock: num(f.stock) });
     onClose();
   };
   return (
@@ -24,99 +25,208 @@ function ProductForm({ product, onClose }) {
         <Field label="SKU"><input className="input" value={f.sku} onChange={set("sku")} /></Field>
         <Field label="Unit"><input className="input" value={f.unit} onChange={set("unit")} /></Field>
         <Field label="Cost price"><input className="input" type="number" step="any" min="0" required value={f.cost} onChange={set("cost")} /></Field>
-        <Field label="Selling price"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>
-        <Field label="Special price (optional)"><input className="input" type="number" step="any" min="0" value={f.specialPrice} onChange={set("specialPrice")} /></Field>
+        {!product && <Field label="Selling price"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>}
         {!product && <Field label="Opening stock"><input className="input" type="number" step="any" min="0" value={f.stock} onChange={set("stock")} /></Field>}
         <Field label="Low-stock alert at"><input className="input" type="number" step="any" min="0" value={f.minStock} onChange={set("minStock")} /></Field>
+        {product && <p className="col-span-2 text-xs text-neutral-400">Selling price is changed when receiving stock (GRN).</p>}
         <button className="btn-primary col-span-2 mt-2">Save</button>
       </form>
     </Modal>
   );
 }
 
-function StockForm({ product, onClose }) {
+function AdjustForm({ product, onClose }) {
   const { uid } = useData();
-  const [type, setType] = useState("purchase");
   const [qty, setQty] = useState("");
-  const [unitCost, setUnitCost] = useState(product.cost);
-  const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
   const save = async (e) => {
     e.preventDefault();
-    const q = num(qty);
-    if (!q) return;
-    await addStockMovement(uid, {
-      productId: product.id, productName: product.name, type, qty: q,
-      unitCost: type === "purchase" ? num(unitCost) : 0, date, note: note.trim(),
-    });
+    if (!num(qty)) return;
+    await adjustStock(uid, { productId: product.id, productName: product.name, qty: num(qty), date: today(), note: note.trim() });
     onClose();
   };
   return (
-    <Modal title={`Update stock · ${product.name}`} onClose={onClose}>
+    <Modal title={`Adjust · ${product.name}`} onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1 text-sm">
-          {[["purchase", "Stock in (purchase)"], ["adjust", "Adjustment"]].map(([k, l]) => (
-            <button type="button" key={k} onClick={() => setType(k)} className={`rounded-md py-1.5 ${type === k ? "bg-white shadow-sm" : "text-neutral-500"}`}>{l}</button>
-          ))}
-        </div>
-        <Field label={type === "purchase" ? `Quantity received (${product.unit})` : "Quantity (use negative to remove, e.g. damaged)"}>
-          <input className="input" type="number" step="any" required autoFocus min={type === "purchase" ? "0" : undefined} value={qty} onChange={(e) => setQty(e.target.value)} />
-        </Field>
-        {type === "purchase" && <Field label="Unit cost"><input className="input" type="number" step="any" min="0" required value={unitCost} onChange={(e) => setUnitCost(e.target.value)} /></Field>}
-        <Field label="Date"><input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-        <Field label="Note"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Supplier, reason…" /></Field>
-        <button className="btn-primary w-full">Save</button>
+        <Field label="Quantity (negative to remove, e.g. damaged)"><input className="input" type="number" step="any" required autoFocus value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
+        <Field label="Reason"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Damaged, count correction…" /></Field>
+        <button className="btn-primary w-full">Save adjustment</button>
       </form>
     </Modal>
   );
 }
 
+const blank = () => ({ productId: "", qty: "", cost: "", mode: "keep", newPrice: "" });
+
+/** One GRN line's price selector: keep current / pick a previous price / enter a new one. */
+function PriceSelect({ product, line, onChange }) {
+  if (!product) return <div className="input bg-neutral-50 text-neutral-300">—</div>;
+  const prev = (product.priceHistory || []).filter((p) => p !== product.price);
+  return (
+    <div className="flex gap-1.5">
+      <select className="input" value={line.mode} onChange={(e) => onChange({ mode: e.target.value })}>
+        <option value="keep">Same · {money(product.price)}</option>
+        {prev.map((p) => <option key={p} value={`p:${p}`}>Previous · {money(p)}</option>)}
+        <option value="new">New price…</option>
+      </select>
+      {line.mode === "new" && (
+        <input className="input !w-24" type="number" step="any" min="0" required autoFocus placeholder="Price" value={line.newPrice} onChange={(e) => onChange({ newPrice: e.target.value })} />
+      )}
+    </div>
+  );
+}
+
+const linePrice = (p, l) => (l.mode === "keep" ? p.price : l.mode === "new" ? num(l.newPrice) : num(l.mode.slice(2)));
+
+function GrnForm({ onClose }) {
+  const { uid, products } = useData();
+  const [date, setDate] = useState(today());
+  const [supplier, setSupplier] = useState("");
+  const [ref, setRef] = useState("");
+  const [lines, setLines] = useState([blank()]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const prod = (id) => products.find((p) => p.id === id);
+  const setLine = (i, patch) => setLines(lines.map((l, k) => (k === i ? { ...l, ...patch } : l)));
+  const pick = (i, productId) => setLine(i, { productId, mode: "keep", newPrice: "", cost: prod(productId)?.cost ?? "" });
+  const valid = lines.filter((l) => l.productId && num(l.qty) > 0);
+  const total = sum(valid, (l) => num(l.qty) * num(l.cost));
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!valid.length) return setError("Add at least one item with a quantity");
+    if (new Set(valid.map((l) => l.productId)).size !== valid.length) return setError("An item appears twice");
+    setBusy(true); setError("");
+    try {
+      await createGrn(uid, {
+        date, supplier: supplier.trim(), ref: ref.trim(), total,
+        items: valid.map((l) => {
+          const p = prod(l.productId);
+          return { productId: p.id, name: p.name, unit: p.unit, qty: num(l.qty), cost: num(l.cost), price: linePrice(p, l), oldPrice: p.price };
+        }),
+      });
+      onClose();
+    } catch (err) { setError(err.message); setBusy(false); }
+  };
+
+  return (
+    <Modal title="Goods received (GRN)" onClose={onClose} wide>
+      <form onSubmit={save} className="space-y-4">
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Date"><input type="date" className="input" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Supplier"><input className="input" value={supplier} onChange={(e) => setSupplier(e.target.value)} /></Field>
+          <Field label="Invoice / ref"><input className="input" value={ref} onChange={(e) => setRef(e.target.value)} /></Field>
+        </div>
+
+        <div className="space-y-3">
+          {lines.map((l, i) => {
+            const p = prod(l.productId);
+            return (
+              <div key={i} className="grid grid-cols-12 items-center gap-2 rounded-lg border border-neutral-200 p-2.5">
+                <select className="input col-span-11 sm:col-span-5" value={l.productId} onChange={(e) => pick(i, e.target.value)}>
+                  <option value="">Select product…</option>
+                  {products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+                <button type="button" className="col-span-1 justify-self-end rounded p-1.5 text-neutral-400 hover:bg-neutral-100 sm:order-last"
+                  onClick={() => setLines(lines.length > 1 ? lines.filter((_, k) => k !== i) : [blank()])}><X size={16} /></button>
+                <input className="input col-span-6 sm:col-span-2" type="number" step="any" min="0" placeholder="Qty" value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
+                <input className="input col-span-6 sm:col-span-2" type="number" step="any" min="0" placeholder="Unit cost" value={l.cost} onChange={(e) => setLine(i, { cost: e.target.value })} />
+                <div className="col-span-12 sm:col-span-12"><span className="label">Selling price</span><PriceSelect product={p} line={l} onChange={(patch) => setLine(i, patch)} /></div>
+              </div>
+            );
+          })}
+          <button type="button" className="text-sm text-neutral-500 hover:text-neutral-900" onClick={() => setLines([...lines, blank()])}>+ Add item</button>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-neutral-100 pt-4">
+          <span className="text-sm text-neutral-500">{valid.length} items · {sum(valid, (l) => num(l.qty))} pcs</span>
+          <span className="text-lg font-semibold">{money(total)}</span>
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button className="btn-primary w-full" disabled={busy}>Save GRN & add to inventory</button>
+      </form>
+    </Modal>
+  );
+}
+
+function GrnList() {
+  const { grns, uid } = useData();
+  const [open, setOpen] = useState(null);
+  if (!grns.length) return <Empty><ClipboardList className="mx-auto mb-2" />No GRNs yet</Empty>;
+  const del = async (g) => {
+    if (!confirm("Delete this GRN and remove its quantities from inventory?")) return;
+    try { await deleteGrn(uid, g); } catch (e) { alert(e.message); }
+  };
+  return (
+    <div className="divide-y divide-neutral-100">
+      {grns.map((g) => (
+        <div key={g.id}>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(open === g.id ? null : g.id)}>
+              <div className="text-sm font-medium">{g.date}{g.supplier && ` · ${g.supplier}`}{g.ref && <span className="text-neutral-400"> · {g.ref}</span>}</div>
+              <div className="text-xs text-neutral-500">{g.items.length} items · {sum(g.items, (i) => i.qty)} pcs · {money(g.total)}</div>
+            </button>
+            <button className="rounded p-1.5 text-red-500 hover:bg-red-50" onClick={() => del(g)}><Trash2 size={15} /></button>
+          </div>
+          {open === g.id && (
+            <table className="mb-2 w-full">
+              <thead><tr><th className="th">Item</th><th className="th text-right">Qty</th><th className="th text-right">Cost</th><th className="th text-right">Selling price</th></tr></thead>
+              <tbody>{g.items.map((i) => (
+                <tr key={i.productId}>
+                  <td className="td !py-1.5">{i.name}</td><td className="td !py-1.5 text-right">{i.qty}</td><td className="td !py-1.5 text-right">{money(i.cost)}</td>
+                  <td className={cn("td !py-1.5 text-right", i.price !== i.oldPrice && "font-medium text-amber-700")}>{i.price !== i.oldPrice ? `${money(i.oldPrice)} → ${money(i.price)}` : money(i.price)}</td>
+                </tr>))}</tbody>
+            </table>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Stock() {
-  const { products, uid } = useData();
+  const { products, runs, uid } = useData();
   const [modal, setModal] = useState(null);
+  const [tab, setTab] = useState("stock");
   const [q, setQ] = useState("");
   const list = products.filter((p) => (p.name + p.sku).toLowerCase().includes(q.toLowerCase()));
+  const van = sum(Object.values(onVehicle(runs)), (v) => v);
 
   return (
     <>
-      <PageHeader title="Stock" subtitle="Products and inventory">
-        <input className="input !w-44" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn-primary" onClick={() => setModal({ t: "product" })}><Plus size={16} />Product</button>
+      <PageHeader title="Inventory" subtitle="Stock, goods received and prices">
+        <button className="btn-ghost" onClick={() => setModal({ t: "product" })}><Plus size={16} />Product</button>
+        <button className="btn-primary" onClick={() => setModal({ t: "grn" })}><ClipboardList size={16} />New GRN</button>
       </PageHeader>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-3 gap-3">
         <Stat label="Products" value={products.length} />
-        <Stat label="Stock value (at cost)" value={money(stockValue(products))} />
-        <Stat label="Low / out of stock" value={products.filter((p) => p.stock <= (p.minStock || 0)).length} />
+        <Stat label="On vehicles" value={van} hint="pcs, not yet unloaded" />
+        <Stat label="Stock value (cost)" value={money(stockValue(products))} />
+      </div>
+
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1 text-sm">
+          {[["stock", "Current stock"], ["grn", "GRN history"]].map(([k, l]) => (
+            <button key={k} onClick={() => setTab(k)} className={cn("rounded-md px-3 py-1.5", tab === k ? "bg-white shadow-sm" : "text-neutral-500")}>{l}</button>
+          ))}
+        </div>
+        {tab === "stock" && <input className="input !w-44" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />}
       </div>
 
       <div className="card overflow-x-auto">
-        {list.length === 0 ? <Empty><Package className="mx-auto mb-2" />No products yet</Empty> : (
-          <table className="w-full">
-            <thead className="border-b border-neutral-100"><tr>
-              <th className="th">Product</th><th className="th text-right">Cost</th><th className="th text-right">Price</th><th className="th text-right">In stock</th><th className="th" />
-            </tr></thead>
-            <tbody className="divide-y divide-neutral-100">
-              {list.map((p) => (
-                <tr key={p.id}>
-                  <td className="td"><div className="font-medium">{p.name}</div><div className="text-xs text-neutral-400">{p.sku}</div></td>
-                  <td className="td text-right">{money(p.cost)}</td>
-                  <td className="td text-right">{money(p.price)}</td>
-                  <td className="td text-right"><Badge tone={p.stock <= 0 ? "red" : p.stock <= (p.minStock || 0) ? "amber" : "green"}>{p.stock} {p.unit}</Badge></td>
-                  <td className="td whitespace-nowrap text-right">
-                    <button title="Receive / adjust stock" className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setModal({ t: "stock", p })}><Truck size={15} /></button>
-                    <button title="Edit" className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setModal({ t: "product", p })}><Pencil size={15} /></button>
-                    <button title="Delete" className="rounded p-1.5 text-red-500 hover:bg-red-50" onClick={() => confirm(`Delete ${p.name}?`) && deleteProduct(uid, p.id)}><Trash2 size={15} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {tab === "grn" ? <GrnList /> : (
+          <StockTable products={list} actions={(p) => (<>
+            <button title="Adjust stock" className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setModal({ t: "adjust", p })}><SlidersHorizontal size={15} /></button>
+            <button title="Edit" className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setModal({ t: "product", p })}><Pencil size={15} /></button>
+            <button title="Delete" className="rounded p-1.5 text-red-500 hover:bg-red-50" onClick={() => confirm(`Delete ${p.name}?`) && deleteProduct(uid, p.id)}><Trash2 size={15} /></button>
+          </>)} />
         )}
       </div>
 
       {modal?.t === "product" && <ProductForm product={modal.p} onClose={() => setModal(null)} />}
-      {modal?.t === "stock" && <StockForm product={modal.p} onClose={() => setModal(null)} />}
+      {modal?.t === "adjust" && <AdjustForm product={modal.p} onClose={() => setModal(null)} />}
+      {modal?.t === "grn" && <GrnForm onClose={() => setModal(null)} />}
     </>
   );
 }

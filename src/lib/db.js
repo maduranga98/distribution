@@ -13,100 +13,113 @@ export const add = (base, name, data) => addDoc(col(base, name), stamp(data));
 export const update = (base, name, id, data) => updateDoc(ref(base, name, id), data);
 export const remove = (base, name, id) => deleteDoc(ref(base, name, id));
 
-/** Record a sale and decrement stock atomically. Rejects if stock is insufficient. */
-export async function createSale(base, sale) {
-  const saleRef = doc(col(base, "sales"));
-  await runTransaction(db, async (tx) => {
-    const snaps = await Promise.all(sale.items.map((i) => tx.get(ref(base, "products", i.productId))));
-    const need = {};
-    sale.items.forEach((i) => (need[i.productId] = (need[i.productId] || 0) + i.qty));
-    snaps.forEach((s, idx) => {
-      const it = sale.items[idx];
-      if (!s.exists()) throw new Error(`Product "${it.name}" no longer exists`);
-      if (s.data().stock < need[it.productId])
-        throw new Error(`Not enough stock for "${it.name}" (available ${s.data().stock})`);
-    });
-    sale.items.forEach((i) => tx.update(ref(base, "products", i.productId), { stock: increment(-i.qty) }));
-    tx.set(saleRef, stamp(sale));
-  });
-  return saleRef.id;
-}
-
-/** Delete a sale and return its items to stock. */
-export async function deleteSale(base, sale) {
-  const batch = writeBatch(db);
-  sale.items.forEach((i) => batch.update(ref(base, "products", i.productId), { stock: increment(i.qty) }));
-  batch.delete(ref(base, "sales", sale.id));
-  await batch.commit();
-}
-
-/** Stock in (purchase) or manual adjustment (+/-). Purchases update unit cost. */
-export async function addStockMovement(base, m) {
-  const batch = writeBatch(db);
-  const patch = { stock: increment(m.qty) };
-  if (m.type === "purchase" && m.unitCost > 0) patch.cost = m.unitCost;
-  batch.update(ref(base, "products", m.productId), patch);
-  batch.set(doc(col(base, "movements")), stamp(m));
-  await batch.commit();
-}
-
 export async function deleteProduct(base, id) {
   await deleteDoc(ref(base, "products", id));
 }
 
-/** Morning loading: take stock out of the warehouse and open a route run. */
-export async function loadRun(base, run) {
-  const runRef = doc(col(base, "runs"));
+/** Manual stock adjustment (+/-), e.g. damaged or counted difference. */
+export async function adjustStock(base, m) {
+  const batch = writeBatch(db);
+  batch.update(ref(base, "products", m.productId), { stock: increment(m.qty) });
+  batch.set(doc(col(base, "movements")), stamp({ ...m, type: "adjust" }));
+  await batch.commit();
+}
+
+/**
+ * GRN: receive stock into inventory. Each line carries the cost and the selling price chosen
+ * in the price selector; the product's price only changes (and is remembered) if it differs.
+ */
+export async function createGrn(base, grn) {
+  const grnRef = doc(col(base, "grns"));
   await runTransaction(db, async (tx) => {
-    const snaps = await Promise.all(run.items.map((i) => tx.get(ref(base, "products", i.productId))));
+    const snaps = await Promise.all(grn.items.map((i) => tx.get(ref(base, "products", i.productId))));
     snaps.forEach((s, idx) => {
-      const it = run.items[idx];
-      if (!s.exists()) throw new Error(`Product "${it.name}" no longer exists`);
-      if (s.data().stock < it.loaded) throw new Error(`Not enough stock for "${it.name}" (available ${s.data().stock})`);
+      if (!s.exists()) throw new Error(`Product "${grn.items[idx].name}" no longer exists`);
+      const i = grn.items[idx], p = s.data();
+      const patch = { stock: increment(i.qty), cost: i.cost };
+      if (i.price !== p.price) {
+        patch.price = i.price;
+        patch.priceHistory = [p.price, ...(p.priceHistory || [])].filter((v, k, a) => v !== i.price && a.indexOf(v) === k).slice(0, 6);
+      }
+      tx.update(s.ref, patch);
     });
-    run.items.forEach((i) => tx.update(ref(base, "products", i.productId), { stock: increment(-i.loaded) }));
-    tx.set(runRef, stamp({ ...run, status: "loaded" }));
+    tx.set(grnRef, stamp(grn));
+  });
+  return grnRef.id;
+}
+
+/** Delete a GRN and take its quantities back out of inventory (blocked if already used). */
+export async function deleteGrn(base, grn) {
+  await runTransaction(db, async (tx) => {
+    const snaps = await Promise.all(grn.items.map((i) => tx.get(ref(base, "products", i.productId))));
+    snaps.forEach((s, idx) => {
+      const i = grn.items[idx];
+      if (s.exists() && s.data().stock < i.qty) throw new Error(`Can't remove: "${i.name}" has only ${s.data().stock} in stock`);
+    });
+    snaps.forEach((s, idx) => s.exists() && tx.update(s.ref, { stock: increment(-grn.items[idx].qty) }));
+    tx.delete(ref(base, "grns", grn.id));
+  });
+}
+
+/**
+ * Save a loading (create, or edit while still on the road). Inventory moves by the difference
+ * between the new and previously saved quantities.
+ */
+export async function saveLoading(base, run, runId) {
+  const runRef = runId ? ref(base, "runs", runId) : doc(col(base, "runs"));
+  await runTransaction(db, async (tx) => {
+    let old = {};
+    if (runId) {
+      const s = await tx.get(runRef);
+      if (!s.exists() || s.data().status !== "loaded") throw new Error("This loading is already unloaded and can't be edited");
+      s.data().items.forEach((i) => (old[i.productId] = i.loaded));
+    }
+    const now = Object.fromEntries(run.items.map((i) => [i.productId, i.loaded]));
+    const ids = [...new Set([...Object.keys(old), ...Object.keys(now)])];
+    const snaps = await Promise.all(ids.map((id) => tx.get(ref(base, "products", id))));
+    snaps.forEach((s, k) => {
+      const delta = (now[ids[k]] || 0) - (old[ids[k]] || 0);
+      if (!delta) return;
+      if (!s.exists()) throw new Error("A product no longer exists");
+      if (delta > 0 && s.data().stock < delta) throw new Error(`Not enough stock for "${s.data().name}" (available ${s.data().stock})`);
+      tx.update(s.ref, { stock: increment(-delta) });
+    });
+    if (runId) tx.update(runRef, run); else tx.set(runRef, stamp({ ...run, status: "loaded" }));
   });
   return runRef.id;
 }
 
-/** Evening unloading: return leftovers to stock, post one sale for the route, close the run. */
-export async function closeRun(base, runId, lines, collections) {
-  const runRef = ref(base, "runs", runId);
-  const saleRef = doc(col(base, "sales"));
-  await runTransaction(db, async (tx) => {
-    const runSnap = await tx.get(runRef);
-    if (!runSnap.exists() || runSnap.data().status !== "loaded") throw new Error("This run is already closed");
-    const run = runSnap.data();
-    const items = run.items.map((i) => ({ ...i, ...lines[i.productId] }));
-    const calc = calcRun(items);
-    if (calc.error) throw new Error(calc.error);
-    const cash = Number(collections.cash) || 0, cheque = Number(collections.cheque) || 0;
-    if (cash + cheque > calc.sales + 0.005) throw new Error("Collected more than the sales value");
-
-    items.forEach((i) => {
-      if (Number(i.returned) > 0) tx.update(ref(base, "products", i.productId), { stock: increment(Number(i.returned)) });
-    });
-    // Net unit price/cost so item totals reconcile (concessions, market returns and free issues are folded in).
-    const sold = calc.rows.filter((r) => r.sold > 0).map((r) => ({
-      productId: r.productId, name: r.name, unit: r.unit, qty: r.sold, price: r.sales / r.sold, cost: r.cost / r.sold,
-    }));
-    tx.set(saleRef, stamp({
-      date: run.date, customerId: null, customerName: `Route · ${run.routeName}`,
-      items: sold, total: calc.sales, cost: calc.cost, paid: cash + cheque, runId,
-    }));
-    tx.update(runRef, {
-      status: "closed", items: calc.rows.map(({ error, ...r }) => r),
-      totals: { sold: calc.sold, gross: calc.gross, concession: calc.concession, marketValue: calc.marketValue, freeValue: calc.freeValue, sales: calc.sales, cost: calc.cost },
-      collections: { cash, cheque, credit: calc.sales - cash - cheque }, saleId: saleRef.id, closedAt: serverTimestamp(),
-    });
-  });
-}
-
-/** Cancel an open run: everything loaded goes back to stock. */
-export async function cancelRun(base, run) {
+/** Cancel a loading that hasn't been unloaded: everything goes back to the warehouse. */
+export async function cancelLoading(base, run) {
   const batch = writeBatch(db);
   run.items.forEach((i) => batch.update(ref(base, "products", i.productId), { stock: increment(i.loaded) }));
   batch.delete(ref(base, "runs", run.id));
   await batch.commit();
+}
+
+/**
+ * Evening unloading (also used to edit one). lines[productId] = { returned, marketReturn }.
+ * Leftover goes back to the warehouse; sold = loaded − returned; market returns reduce the sale value.
+ */
+export async function saveUnloading(base, runId, lines) {
+  const runRef = ref(base, "runs", runId);
+  await runTransaction(db, async (tx) => {
+    const s = await tx.get(runRef);
+    if (!s.exists()) throw new Error("Loading not found");
+    const run = s.data();
+    const items = run.items.map((i) => ({ ...i, ...lines[i.productId] }));
+    const calc = calcRun(items);
+    if (calc.error) throw new Error(calc.error);
+    const wasDone = run.status !== "loaded";
+    run.items.forEach((i) => {
+      const delta = Number(lines[i.productId]?.returned || 0) - (wasDone ? Number(i.returned || 0) : 0);
+      if (delta) tx.update(ref(base, "products", i.productId), { stock: increment(delta) });
+    });
+    tx.update(runRef, {
+      status: "unloaded",
+      items: calc.rows.map(({ error, ...r }) => r),
+      totals: { loaded: calc.loaded, sold: calc.sold, gross: calc.gross, marketValue: calc.marketValue, sales: calc.sales, cost: calc.cost },
+      unloadedAt: serverTimestamp(),
+    });
+  });
 }
