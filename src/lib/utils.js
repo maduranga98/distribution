@@ -21,5 +21,5 @@ export function fmtQty(n, caseSize, unit = "pcs") {
   return sign + parts;
 }
 
-/** Default profit margin (% of MRP) when a business has none set. */
+/** Default profit margin (% of retail sales) when a business has none set. */
 export const DEFAULT_MARGIN = 6;
