@@ -9,6 +9,12 @@ export const useData = () => useContext(Ctx);
 
 const NAMES = ["products", "expenses", "movements", "ledger", "priceLog", "grns", "routes", "runs"];
 
+/** Manual-sheet order: products with a saved `order` first (ascending); the rest keep their newest-first order. */
+const byOrder = (list) => {
+  const key = (p) => (Number.isFinite(p.order) ? p.order : Infinity);
+  return [...list].sort((a, b) => key(a) - key(b));
+};
+
 export function DataProvider({ children }) {
   const { current } = useBusiness();
   const base = `${OWNER}/businesses/${current.id}`;
@@ -35,7 +41,7 @@ export function DataProvider({ children }) {
       uid: base, // data path prefix for the active business
       margin: Number.isFinite(current.margin) ? current.margin : DEFAULT_MARGIN, // profit % of MRP
       loading: NAMES.some((n) => !ready[n]),
-      products: g("products"),
+      products: byOrder(g("products")),
       expenses: g("expenses"), movements: g("movements"), ledger: g("ledger"), priceLog: g("priceLog"), grns: g("grns"), routes: g("routes"), runs: g("runs"),
     };
   }, [data, ready, base, current.margin]);
