@@ -1,6 +1,7 @@
 import { Package } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { onVehicle } from "../lib/accounts";
+import { fmtQty } from "../lib/utils";
 import { Badge, Empty } from "./ui";
 
 /** Live stock: warehouse, on the vehicle (loaded, not yet unloaded) and total. */
@@ -20,11 +21,11 @@ export default function StockTable({ products, actions }) {
           const v = van[p.id] || 0;
           return (
             <tr key={p.id}>
-              <td className="td"><div className="font-medium">{p.name}</div><div className="text-xs text-neutral-400">{p.sku}</div></td>
+              <td className="td"><div className="font-medium">{p.name}</div><div className="text-xs text-neutral-400">{p.sku}{p.caseSize > 1 && ` · ${p.caseSize} per case`}</div></td>
               <td className="td text-right">{Number(p.price).toFixed(2)}</td>
-              <td className="td text-right"><Badge tone={p.stock <= 0 ? "red" : p.stock <= (p.minStock || 0) ? "amber" : "green"}>{p.stock} {p.unit}</Badge></td>
-              <td className="td text-right text-neutral-500">{v || "—"}</td>
-              <td className="td text-right font-medium">{p.stock + v}</td>
+              <td className="td text-right"><Badge tone={p.stock <= 0 ? "red" : p.stock <= (p.minStock || 0) ? "amber" : "green"}>{fmtQty(p.stock, p.caseSize, p.unit)}</Badge></td>
+              <td className="td text-right text-neutral-500">{v ? fmtQty(v, p.caseSize, p.unit) : "—"}</td>
+              <td className="td text-right font-medium">{fmtQty(p.stock + v, p.caseSize, p.unit)}</td>
               {actions && <td className="td whitespace-nowrap text-right">{actions(p)}</td>}
             </tr>
           );

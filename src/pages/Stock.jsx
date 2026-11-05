@@ -3,17 +3,18 @@ import { ClipboardList, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucid
 import { useData } from "../context/DataContext";
 import { add, adjustStock, createGrn, deleteGrn, deleteProduct, update } from "../lib/db";
 import { onVehicle, stockValue } from "../lib/accounts";
-import { cn, money, num, sum, today } from "../lib/utils";
+import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
 import { Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
 import StockTable from "../components/StockTable";
+import QtyInput from "../components/QtyInput";
 
 function ProductForm({ product, onClose }) {
   const { uid } = useData();
-  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", cost: "", price: "", minStock: "", stock: "", ...product });
+  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", caseSize: "", cost: "", price: "", minStock: "", stock: "", ...product });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = async (e) => {
     e.preventDefault();
-    const data = { name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", cost: num(f.cost), minStock: num(f.minStock) };
+    const data = { name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", caseSize: num(f.caseSize) > 1 ? num(f.caseSize) : 0, cost: num(f.cost), minStock: num(f.minStock) };
     if (product) await update(uid, "products", product.id, data); // price changes go through GRN
     else await add(uid, "products", { ...data, price: num(f.price), priceHistory: [], stock: num(f.stock) });
     onClose();
@@ -24,9 +25,10 @@ function ProductForm({ product, onClose }) {
         <div className="col-span-2"><Field label="Name"><input className="input" required autoFocus value={f.name} onChange={set("name")} /></Field></div>
         <Field label="SKU"><input className="input" value={f.sku} onChange={set("sku")} /></Field>
         <Field label="Unit"><input className="input" value={f.unit} onChange={set("unit")} /></Field>
-        <Field label="Cost price"><input className="input" type="number" step="any" min="0" required value={f.cost} onChange={set("cost")} /></Field>
-        {!product && <Field label="Selling price"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>}
-        {!product && <Field label="Opening stock"><input className="input" type="number" step="any" min="0" value={f.stock} onChange={set("stock")} /></Field>}
+        <div className="col-span-2"><Field label="Pieces per case (blank if not sold in cases)"><input className="input" type="number" step="1" min="0" placeholder="e.g. 48" value={f.caseSize || ""} onChange={set("caseSize")} /></Field></div>
+        <Field label="Cost price (per piece)"><input className="input" type="number" step="any" min="0" required value={f.cost} onChange={set("cost")} /></Field>
+        {!product && <Field label="Selling price (per piece)"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>}
+        {!product && <Field label="Opening stock"><QtyInput caseSize={f.caseSize} value={String(f.stock)} onChange={(v) => setF({ ...f, stock: v })} /></Field>}
         <Field label="Low-stock alert at"><input className="input" type="number" step="any" min="0" value={f.minStock} onChange={set("minStock")} /></Field>
         {product && <p className="col-span-2 text-xs text-neutral-400">Selling price is changed when receiving stock (GRN).</p>}
         <button className="btn-primary col-span-2 mt-2">Save</button>
@@ -38,17 +40,23 @@ function ProductForm({ product, onClose }) {
 function AdjustForm({ product, onClose }) {
   const { uid } = useData();
   const [qty, setQty] = useState("");
+  const [sign, setSign] = useState(-1);
   const [note, setNote] = useState("");
   const save = async (e) => {
     e.preventDefault();
     if (!num(qty)) return;
-    await adjustStock(uid, { productId: product.id, productName: product.name, qty: num(qty), date: today(), note: note.trim() });
+    await adjustStock(uid, { productId: product.id, productName: product.name, qty: sign * num(qty), date: today(), note: note.trim() });
     onClose();
   };
   return (
     <Modal title={`Adjust · ${product.name}`} onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
-        <Field label="Quantity (negative to remove, e.g. damaged)"><input className="input" type="number" step="any" required autoFocus value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1 text-sm">
+          {[[-1, "Remove (damaged…)"], [1, "Add"]].map(([k, l]) => (
+            <button type="button" key={k} onClick={() => setSign(k)} className={cn("rounded-md py-1.5", sign === k ? "bg-white shadow-sm" : "text-neutral-500")}>{l}</button>
+          ))}
+        </div>
+        <Field label={`Quantity · in stock ${fmtQty(product.stock, product.caseSize, product.unit)}`}><QtyInput autoFocus caseSize={product.caseSize} value={qty} onChange={setQty} /></Field>
         <Field label="Reason"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Damaged, count correction…" /></Field>
         <button className="btn-primary w-full">Save adjustment</button>
       </form>
@@ -102,7 +110,7 @@ function GrnForm({ onClose }) {
         date, supplier: supplier.trim(), ref: ref.trim(), total,
         items: valid.map((l) => {
           const p = prod(l.productId);
-          return { productId: p.id, name: p.name, unit: p.unit, qty: num(l.qty), cost: num(l.cost), price: linePrice(p, l), oldPrice: p.price };
+          return { productId: p.id, name: p.name, unit: p.unit, caseSize: p.caseSize || 0, qty: num(l.qty), cost: num(l.cost), price: linePrice(p, l), oldPrice: p.price };
         }),
       });
       onClose();
@@ -129,8 +137,8 @@ function GrnForm({ onClose }) {
                 </select>
                 <button type="button" className="col-span-1 justify-self-end rounded p-1.5 text-neutral-400 hover:bg-neutral-100 sm:order-last"
                   onClick={() => setLines(lines.length > 1 ? lines.filter((_, k) => k !== i) : [blank()])}><X size={16} /></button>
-                <input className="input col-span-6 sm:col-span-2" type="number" step="any" min="0" placeholder="Qty" value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
-                <input className="input col-span-6 sm:col-span-2" type="number" step="any" min="0" placeholder="Unit cost" value={l.cost} onChange={(e) => setLine(i, { cost: e.target.value })} />
+                <div className="col-span-6 sm:col-span-3"><QtyInput caseSize={p?.caseSize} value={l.qty} onChange={(v) => setLine(i, { qty: v })} /></div>
+                <input className="input col-span-6 sm:col-span-2" type="number" step="any" min="0" placeholder="Cost / pc" value={l.cost} onChange={(e) => setLine(i, { cost: e.target.value })} />
                 <div className="col-span-12 sm:col-span-12"><span className="label">Selling price</span><PriceSelect product={p} line={l} onChange={(patch) => setLine(i, patch)} /></div>
               </div>
             );
@@ -139,7 +147,7 @@ function GrnForm({ onClose }) {
         </div>
 
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4">
-          <span className="text-sm text-neutral-500">{valid.length} items · {sum(valid, (l) => num(l.qty))} pcs</span>
+          <span className="text-sm text-neutral-500">{valid.length} items · {sum(valid, (l) => num(l.qty))} pcs in total</span>
           <span className="text-lg font-semibold">{money(total)}</span>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -170,10 +178,10 @@ function GrnList() {
           </div>
           {open === g.id && (
             <table className="mb-2 w-full">
-              <thead><tr><th className="th">Item</th><th className="th text-right">Qty</th><th className="th text-right">Cost</th><th className="th text-right">Selling price</th></tr></thead>
+              <thead><tr><th className="th">Item</th><th className="th text-right">Qty</th><th className="th text-right">Cost / pc</th><th className="th text-right">Selling price / pc</th></tr></thead>
               <tbody>{g.items.map((i) => (
                 <tr key={i.productId}>
-                  <td className="td !py-1.5">{i.name}</td><td className="td !py-1.5 text-right">{i.qty}</td><td className="td !py-1.5 text-right">{money(i.cost)}</td>
+                  <td className="td !py-1.5">{i.name}</td><td className="td !py-1.5 text-right">{fmtQty(i.qty, i.caseSize, i.unit)}</td><td className="td !py-1.5 text-right">{money(i.cost)}</td>
                   <td className={cn("td !py-1.5 text-right", i.price !== i.oldPrice && "font-medium text-amber-700")}>{i.price !== i.oldPrice ? `${money(i.oldPrice)} → ${money(i.price)}` : money(i.price)}</td>
                 </tr>))}</tbody>
             </table>

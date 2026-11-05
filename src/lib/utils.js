@@ -9,3 +9,14 @@ export const num = (v) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
 export const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
 export const cn = (...c) => c.filter(Boolean).join(" ");
 export const inRange = (date, from, to) => (!from || date >= from) && (!to || date <= to);
+
+/** Stock is always stored in pieces. caseSize = pieces per case (0/1 = sold loose only). */
+export function fmtQty(n, caseSize, unit = "pcs") {
+  n = Math.round((Number(n) || 0) * 1000) / 1000;
+  const cs = Number(caseSize) || 0;
+  if (cs <= 1) return `${n} ${unit}`;
+  const sign = n < 0 ? "-" : "", a = Math.abs(n);
+  const c = Math.floor(a / cs), r = Math.round((a - c * cs) * 1000) / 1000;
+  const parts = [c && `${c} cs`, (r || !c) && `${r} ${unit}`].filter(Boolean).join(" ");
+  return sign + parts;
+}

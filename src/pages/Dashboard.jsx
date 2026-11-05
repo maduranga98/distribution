@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useData } from "../context/DataContext";
 import { stockValue, summarize } from "../lib/accounts";
-import { monthStart, money, sum, today } from "../lib/utils";
+import { fmtQty, monthStart, money, today } from "../lib/utils";
 import { Badge, PageHeader, Stat } from "../components/ui";
 
 export default function Dashboard() {
@@ -56,7 +56,7 @@ export default function Dashboard() {
               {low.slice(0, 6).map((p) => (
                 <li key={p.id} className="flex items-center justify-between py-2 text-sm">
                   <span>{p.name}</span>
-                  <Badge tone={p.stock <= 0 ? "red" : "amber"}>{p.stock} {p.unit}</Badge>
+                  <Badge tone={p.stock <= 0 ? "red" : "amber"}>{fmtQty(p.stock, p.caseSize, p.unit)}</Badge>
                 </li>
               ))}
             </ul>

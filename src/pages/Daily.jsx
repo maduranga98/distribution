@@ -3,9 +3,10 @@ import { Boxes, ChevronDown, MapPin, PackageCheck, PackageMinus, Pencil, Plus, T
 import { useData } from "../context/DataContext";
 import { add, cancelLoading, remove, saveLoading, saveUnloading, update } from "../lib/db";
 import { calcRun } from "../lib/runs";
-import { cn, money, num, sum, today } from "../lib/utils";
+import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
 import { Badge, Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
 import StockTable from "../components/StockTable";
+import QtyInput from "../components/QtyInput";
 
 function RouteForm({ route, onClose }) {
   const { uid } = useData();
@@ -84,7 +85,7 @@ function LoadForm({ date, run, onClose }) {
     try {
       await saveLoading(uid, {
         date: d, routeId, routeName: route.name, visit,
-        items: picked.map((p) => ({ productId: p.id, name: p.name, unit: p.unit, loaded: num(qty[p.id]), price: priceOf(p), cost: old[p.id]?.cost ?? p.cost })),
+        items: picked.map((p) => ({ productId: p.id, name: p.name, unit: p.unit, caseSize: p.caseSize || 0, loaded: num(qty[p.id]), price: priceOf(p), cost: old[p.id]?.cost ?? p.cost })),
       }, run?.id);
       onClose();
     } catch (err) { setError(err.message); setBusy(false); }
@@ -106,15 +107,14 @@ function LoadForm({ date, run, onClose }) {
         <div className="max-h-[45vh] divide-y divide-neutral-100 overflow-y-auto rounded-lg border border-neutral-200">
           {list.map((p) => (
             <div key={p.id} className="flex items-center gap-3 px-3 py-2">
-              <div className="min-w-0 flex-1"><div className="truncate text-sm">{p.name}</div><div className="text-xs text-neutral-400">{room(p)} {p.unit} available · price {money(priceOf(p))}</div></div>
-              <input className={cn("input !w-24 text-right", num(qty[p.id]) > room(p) && "!border-red-400")} type="number" min="0" step="any" placeholder="0"
-                value={qty[p.id] ?? ""} onChange={(e) => setQty({ ...qty, [p.id]: e.target.value })} />
+              <div className="min-w-0 flex-1"><div className="truncate text-sm">{p.name}</div><div className="text-xs text-neutral-400">{fmtQty(room(p), p.caseSize, p.unit)} available · {money(priceOf(p))} / pc</div></div>
+              <QtyInput className={num(qty[p.id]) > room(p) ? "[&_input]:!border-red-400" : ""} caseSize={p.caseSize} value={qty[p.id] ?? ""} onChange={(v) => setQty({ ...qty, [p.id]: v })} />
             </div>
           ))}
           {list.length === 0 && <p className="py-6 text-center text-sm text-neutral-400">No products</p>}
         </div>
         <div className="flex items-center justify-between text-sm text-neutral-500">
-          <span>{picked.length} items · {sum(picked, (p) => num(qty[p.id]))} pcs</span>
+          <span>{picked.length} items · {sum(picked, (p) => num(qty[p.id]))} pcs in total</span>
           <span>Value {money(sum(picked, (p) => num(qty[p.id]) * priceOf(p)))}</span>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -142,15 +142,14 @@ function UnloadForm({ run, onClose }) {
       onClose();
     } catch (err) { setError(err.message); setBusy(false); }
   };
-  const num2 = "input !w-20 !px-2 !py-1 text-right";
 
   return (
     <Modal title={`${run.status === "loaded" ? "Unload" : "Edit unloading"} · ${run.routeName}`} onClose={onClose} wide>
       <form onSubmit={save} className="space-y-4">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px]">
+          <table className="w-full min-w-[720px]">
             <thead><tr>
-              <th className="th !px-2">Item</th><th className="th !px-2 text-right">Price</th><th className="th !px-2 text-right">Loaded</th>
+              <th className="th !px-2">Item</th><th className="th !px-2 text-right">Price / pc</th><th className="th !px-2 text-right">Loaded</th>
               <th className="th !px-1 text-right">Unloaded</th><th className="th !px-2 text-right">Sold</th>
               <th className="th !px-1 text-right">Market return</th><th className="th !px-2 text-right">Net</th>
             </tr></thead>
@@ -159,10 +158,10 @@ function UnloadForm({ run, onClose }) {
                 <tr key={r.productId}>
                   <td className="td !px-2 !py-1.5">{r.name}</td>
                   <td className="td !px-2 !py-1.5 text-right text-neutral-500">{money(r.price)}</td>
-                  <td className="td !px-2 !py-1.5 text-right text-neutral-500">{r.loaded}</td>
-                  <td className="!px-1 !py-1.5"><input className={num2} type="number" min="0" step="any" placeholder="0" value={v[r.productId].returned} onChange={(e) => set(r.productId, "returned", e.target.value)} /></td>
-                  <td className={cn("td !px-2 !py-1.5 text-right font-medium", r.error && "text-red-600")}>{r.sold}</td>
-                  <td className="!px-1 !py-1.5"><input className={num2} type="number" min="0" step="any" placeholder="0" value={v[r.productId].marketReturn} onChange={(e) => set(r.productId, "marketReturn", e.target.value)} /></td>
+                  <td className="td !px-2 !py-1.5 text-right text-neutral-500">{fmtQty(r.loaded, r.caseSize, r.unit)}</td>
+                  <td className="!px-1 !py-1.5"><QtyInput caseSize={r.caseSize} value={v[r.productId].returned} onChange={(x) => set(r.productId, "returned", x)} /></td>
+                  <td className={cn("td !px-2 !py-1.5 text-right font-medium", r.error && "text-red-600")}>{fmtQty(r.sold, r.caseSize, r.unit)}</td>
+                  <td className="!px-1 !py-1.5"><QtyInput caseSize={r.caseSize} value={v[r.productId].marketReturn} onChange={(x) => set(r.productId, "marketReturn", x)} /></td>
                   <td className="td !px-2 !py-1.5 text-right">{money(r.sales)}</td>
                 </tr>
               ))}
@@ -213,14 +212,14 @@ function RunCard({ run, onEdit, onUnload }) {
         <div className="overflow-x-auto border-t border-neutral-100">
           <table className="w-full">
             <thead><tr>
-              <th className="th">Item</th><th className="th text-right">Price</th><th className="th text-right">Loaded</th>
+              <th className="th">Item</th><th className="th text-right">Price / pc</th><th className="th text-right">Loaded</th>
               {done && <><th className="th text-right">Unloaded</th><th className="th text-right">Sold</th><th className="th text-right">Mkt return</th><th className="th text-right">Net</th></>}
             </tr></thead>
             <tbody className="divide-y divide-neutral-100">
               {run.items.map((i) => (
                 <tr key={i.productId}>
-                  <td className="td">{i.name}</td><td className="td text-right">{money(i.price)}</td><td className="td text-right">{i.loaded}</td>
-                  {done && <><td className="td text-right">{i.returned || 0}</td><td className="td text-right">{i.sold}</td><td className="td text-right">{i.marketReturn || 0}</td><td className="td text-right">{money(i.sales)}</td></>}
+                  <td className="td">{i.name}</td><td className="td text-right">{money(i.price)}</td><td className="td text-right">{fmtQty(i.loaded, i.caseSize, i.unit)}</td>
+                  {done && <><td className="td text-right">{fmtQty(i.returned || 0, i.caseSize, i.unit)}</td><td className="td text-right">{fmtQty(i.sold, i.caseSize, i.unit)}</td><td className="td text-right">{fmtQty(i.marketReturn || 0, i.caseSize, i.unit)}</td><td className="td text-right">{money(i.sales)}</td></>}
                 </tr>
               ))}
             </tbody>
@@ -250,7 +249,7 @@ export default function Daily() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="Loadings" value={list.length} hint={`${list.length - done.length} on the road`} />
-        <Stat label="Qty sold" value={t("sold")} hint="loaded − unloaded" />
+        <Stat label="Pieces sold" value={t("sold")} hint="loaded − unloaded" />
         <Stat label="Sale value" value={money(t("gross"))} />
         <Stat label="Market returns" value={`−${money(t("marketValue"))}`} tone={t("marketValue") ? "bad" : undefined} />
         <Stat label="Net sale" value={money(t("sales"))} tone="good" />
