@@ -13,6 +13,8 @@ Sold qty = loaded − unloaded; net sale = sold × price − market returns × p
 **Free issues** are entered at unloading (per-item guide: 1 free per N pcs sold). They are part of sold qty but not paid for, so sale value = (sold − free) × price; their value is shown for information and is not deducted from profit.
 **Analytics** also has a *Cash log*, *Month summary* and a 12-month *Year tracker*.
 
+**Routes** (own section) has a *Route planner* — add routes with ordered stops, weekdays, sales target and planned km, and a weekly board to assign routes to days — and a *Route analysis* with per-route sales, avg per run, vs target, returns, sales per km, expenses, cash short/excess, best weekday and plain-language insights.
+
 ## Setup
 1. Create a Firebase project; enable **Firestore** (no login is used).
 2. Add a web app and copy its config into `.env` (see `.env.example`).

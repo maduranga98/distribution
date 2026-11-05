@@ -1,61 +1,13 @@
 import { useMemo, useState } from "react";
-import { Boxes, ChevronDown, MapPin, PackageCheck, PackageMinus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Boxes, ChevronDown, MapPin, PackageCheck, PackageMinus, Pencil, Trash2 } from "lucide-react";
 import { useData } from "../context/DataContext";
-import { add, cancelLoading, remove, saveLoading, update } from "../lib/db";
+import { cancelLoading, saveLoading } from "../lib/db";
 import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
 import { Badge, Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
 import StockTable from "../components/StockTable";
 import QtyInput from "../components/QtyInput";
 import UnloadForm from "../components/UnloadForm";
-
-function RouteForm({ route, onClose }) {
-  const { uid } = useData();
-  const [f, setF] = useState({ name: "", towns: "", vehicle: "", notes: "", ...route });
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const save = async (e) => {
-    e.preventDefault();
-    const data = { name: f.name.trim(), towns: f.towns.trim(), vehicle: f.vehicle.trim(), notes: f.notes.trim() };
-    if (route) await update(uid, "routes", route.id, data); else await add(uid, "routes", data);
-    onClose();
-  };
-  return (
-    <form onSubmit={save} className="space-y-3 border-t border-neutral-100 pt-4">
-      <Field label="Route name"><input className="input" required autoFocus value={f.name} onChange={set("name")} /></Field>
-      <Field label="Towns covered"><input className="input" value={f.towns} onChange={set("towns")} /></Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Vehicle / driver"><input className="input" value={f.vehicle} onChange={set("vehicle")} /></Field>
-        <Field label="Notes"><input className="input" value={f.notes} onChange={set("notes")} placeholder="Usual days…" /></Field>
-      </div>
-      <div className="flex gap-2"><button className="btn-primary flex-1">Save route</button><button type="button" className="btn-ghost" onClick={onClose}>Cancel</button></div>
-    </form>
-  );
-}
-
-function ManageRoutes({ onClose }) {
-  const { routes, runs, uid } = useData();
-  const [edit, setEdit] = useState(null); // {} = new, route = editing
-  return (
-    <Modal title="Routes" onClose={onClose}>
-      <div className="mb-3 divide-y divide-neutral-100">
-        {routes.length === 0 && <p className="py-6 text-center text-sm text-neutral-400">No routes yet</p>}
-        {routes.map((r) => (
-          <div key={r.id} className="flex items-center justify-between gap-2 py-2.5">
-            <div className="min-w-0"><div className="truncate text-sm font-medium">{r.name}</div><div className="truncate text-xs text-neutral-400">{r.towns || "—"}</div></div>
-            <div className="flex shrink-0">
-              <button className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setEdit(r)}><Pencil size={15} /></button>
-              <button className="rounded p-1.5 text-red-500 hover:bg-red-50" onClick={() => {
-                if (runs.some((x) => x.routeId === r.id)) return alert("This route has recorded runs and can't be deleted.");
-                confirm(`Delete ${r.name}?`) && remove(uid, "routes", r.id);
-              }}><Trash2 size={15} /></button>
-            </div>
-          </div>
-        ))}
-      </div>
-      {edit ? <RouteForm key={edit.id || "new"} route={edit.id ? edit : null} onClose={() => setEdit(null)} />
-        : <button className="btn-ghost w-full" onClick={() => setEdit({})}><Plus size={16} />Add route</button>}
-    </Modal>
-  );
-}
 
 /** Morning loading. With `run` it edits a saved loading; stock moves by the difference. */
 function LoadForm({ date, run, onClose }) {
@@ -201,7 +153,7 @@ export default function Daily() {
       <PageHeader title="Daily" subtitle="Loading, unloading & sales">
         <input type="date" className="input !w-40" value={date} onChange={(e) => setDate(e.target.value || today())} />
         <button className="btn-ghost" onClick={() => setModal({ t: "stock" })}><Boxes size={16} />Current stock</button>
-        <button className="btn-ghost" onClick={() => setModal({ t: "routes" })}><MapPin size={16} />Routes</button>
+        <Link to="/routes" className="btn-ghost"><MapPin size={16} />Routes</Link>
         <button className="btn-primary" onClick={() => setModal({ t: "load" })}><PackageMinus size={16} />Load route</button>
       </PageHeader>
 
@@ -221,7 +173,6 @@ export default function Daily() {
               onUnload={() => setModal({ t: "unload", run: r })} />)}
       </div>
 
-      {modal?.t === "routes" && <ManageRoutes onClose={() => setModal(null)} />}
       {modal?.t === "load" && <LoadForm date={date} run={modal.run} onClose={() => setModal(null)} />}
       {modal?.t === "unload" && <UnloadForm run={modal.run} onClose={() => setModal(null)} />}
       {modal?.t === "stock" && (
