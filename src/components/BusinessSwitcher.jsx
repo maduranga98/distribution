@@ -17,7 +17,7 @@ function NameForm({ business, onClose }) {
     <Modal title={business ? "Edit business" : "New business"} onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
         <Field label="Name"><input className="input" required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field label="Profit margin (% of MRP)"><input className="input" type="number" step="any" min="0" max="100" required value={margin} onChange={(e) => setMargin(e.target.value)} /></Field>
+        <Field label="Profit margin (% of retail price)"><input className="input" type="number" step="any" min="0" max="100" required value={margin} onChange={(e) => setMargin(e.target.value)} /></Field>
         <button className="btn-primary w-full">Save</button>
       </form>
     </Modal>

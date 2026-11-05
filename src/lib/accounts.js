@@ -10,7 +10,7 @@ export function summarize({ runs, expenses, grns, margin = DEFAULT_MARGIN }, fro
   const gross = sum(r, (x) => x.totals?.gross ?? 0);
   const marketReturns = sum(r, (x) => x.totals?.marketValue ?? 0);
   const revenue = sum(r, (x) => x.totals?.sales ?? 0);
-  const cogs = sum(r, (x) => x.totals?.cost ?? 0) * (1 - margin / 100); // buying cost = MRP less profit margin
+  const cogs = revenue * (1 - margin / 100); // profit is margin % of retail sales, the rest is cost
   const expenseTotal = sum(e, (x) => x.amount);
   return {
     gross, marketReturns, revenue, cogs, grossProfit: revenue - cogs, expenses: expenseTotal,
