@@ -2,9 +2,9 @@
 
 React + Vite + Tailwind + Firebase (Auth, Firestore, Hosting).
 
-**Features:** stock & products (receive stock, adjustments, low-stock alerts) · daily sales with
-line items, cash/credit, atomic stock deduction · customers & credit balances / payments ·
-expenses by category · accounts (P&L, cash flow, stock value, receivables) · dashboard.
+**Flow:** Inventory → GRN (receive stock, optional new selling price per item) → Loading (pick date + route, save, edit
+until unloaded) → Unloading in the evening (unloaded qty + optional market returns, editable) → Daily sales.
+Sold qty = loaded − unloaded; net sale = sold × price − market returns × price. Current stock shows warehouse, on-vehicle and total.
 
 ## Setup
 1. Create a Firebase project; enable **Firestore** (no login is used).
@@ -19,6 +19,6 @@ npm run build && firebase deploy --only hosting,firestore
 ```
 
 ## Data model
-Each business lives under `users/owner/businesses/{businessId}/…` (`products`, `customers`, `sales`, `payments`,
-`expenses`, `movements`); `firestore.rules` is open to that path (no login).
-Sales snapshot cost price per item, so historical profit stays correct when costs change.
+Each business lives under `users/owner/businesses/{businessId}/…`: `products` (stock, cost, price, priceHistory), `grns`,
+`routes`, `runs` (a loading and, once unloaded, its unloading + totals), `expenses`, `movements` (manual adjustments).
+`firestore.rules` is open to that path (no login). Loadings snapshot price and cost per item, so history stays correct when prices change.
