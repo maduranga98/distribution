@@ -50,9 +50,9 @@ export function analyze({ runs }, from, to) {
   return {
     runCount: rs.length, gross, marketValue, net, expenses, distance, oldCash, oldCheque, difference, counted,
     pie: [
-      { key: "cash", label: "Cash", value: cash, color: "#171717" },
+      { key: "cash", label: "Cash", value: cash, color: "#001948" },
       { key: "cheques", label: "Cheques", value: cheques, color: "#2563eb" },
-      { key: "credit", label: "Credit", value: credit, color: "#f59e0b" },
+      { key: "credit", label: "Credit", value: credit, color: "#fd6b01" },
       { key: "discount", label: "Discounts", value: discount, color: "#8b5cf6" },
       { key: "returns", label: "Market returns", value: marketValue, color: "#ef4444" },
       { key: "unrecorded", label: "Not recorded", value: unrecorded, color: "#d4d4d4" },

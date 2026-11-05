@@ -120,7 +120,7 @@ export default function UnloadForm({ run, onClose }) {
           ))}
           <div className="flex items-center justify-between">
             <button type="button" className="btn-ghost" onClick={() => setExp([...exp, { category: CATEGORIES[0], amount: "", note: "" }])}><Plus size={15} />Add expense</button>
-            <span className="text-sm text-neutral-500">Total <b className="text-neutral-900">{money(expTotal)}</b></span>
+            <span className="text-sm text-neutral-500">Total <b className="text-brand">{money(expTotal)}</b></span>
           </div>
         </Section>
 

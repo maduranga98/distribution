@@ -60,7 +60,7 @@ function Overview({ a }) {
           <div className="flex h-36 items-end gap-1 overflow-x-auto">
             {a.days.map((d) => (
               <div key={d.date} className="flex min-w-[18px] flex-1 flex-col items-center gap-1" title={`${d.date} · ${money(d.net)}`}>
-                <div className="w-full rounded bg-neutral-900" style={{ height: `${Math.max((Math.max(d.net, 0) / max) * 100, 2)}%` }} />
+                <div className="w-full rounded bg-brand" style={{ height: `${Math.max((Math.max(d.net, 0) / max) * 100, 2)}%` }} />
                 <span className="text-[9px] text-neutral-400">{d.date.slice(8)}</span>
               </div>
             ))}
@@ -225,7 +225,7 @@ export default function Analytics() {
       </PageHeader>
       <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg bg-neutral-100 p-1">
         {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={cn("flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition", tab === k ? "bg-white shadow-sm" : "text-neutral-500 hover:text-neutral-900")}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} className={cn("flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition", tab === k ? "bg-white shadow-sm" : "text-neutral-500 hover:text-brand")}>{l}</button>
         ))}
       </div>
       {tab === "cash" ? <CashLog /> : tab === "month" ? <MonthSummary /> : tab === "year" ? <YearTracker /> : <View a={a} />}

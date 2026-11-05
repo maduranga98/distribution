@@ -172,7 +172,7 @@ function GrnForm({ onClose }) {
               </div>
             );
           })}
-          <button type="button" className="text-sm text-neutral-500 hover:text-neutral-900" onClick={() => setLines([...lines, blank()])}>+ Add item</button>
+          <button type="button" className="text-sm text-neutral-500 hover:text-brand" onClick={() => setLines([...lines, blank()])}>+ Add item</button>
         </div>
 
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4">

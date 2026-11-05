@@ -84,7 +84,7 @@ function RouteForm({ route, onClose }) {
           <div className="flex flex-wrap gap-1.5">
             {WEEK.map((d) => (
               <button key={d} type="button" onClick={() => toggle(d)}
-                className={cn("rounded-lg border px-3 py-1.5 text-sm transition", days.includes(d) ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 hover:bg-neutral-100")}>
+                className={cn("rounded-lg border px-3 py-1.5 text-sm transition", days.includes(d) ? "border-brand bg-brand text-white" : "border-neutral-200 hover:bg-neutral-100")}>
                 {DAY_SHORT[d]}
               </button>
             ))}
@@ -117,7 +117,7 @@ function DayCard({ day, routes, avg, isToday, onEdit }) {
   };
   const target = here.reduce((s, r) => s + (r.target || 0), 0);
   return (
-    <div className={cn("card flex flex-col p-3", isToday && "border-neutral-900")}>
+    <div className={cn("card flex flex-col p-3", isToday && "border-brand")}>
       <div className="mb-2 flex items-center justify-between">
         <p className="text-sm font-semibold">{DAY_NAMES[day]}</p>
         {isToday && <Badge tone="green">Today</Badge>}
@@ -277,7 +277,7 @@ function Analysis({ from, to }) {
             return (
               <div key={w} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5" title={x.avg != null ? money(x.avg) : "No runs"}>
                 <span className="text-[10px] text-neutral-400">{x.avg != null ? Math.round(x.avg) : ""}</span>
-                <div className="w-full rounded-t bg-neutral-900" style={{ height: `${((x.avg || 0) / dmax) * 100}%`, minHeight: x.avg ? 3 : 0 }} />
+                <div className="w-full rounded-t bg-brand" style={{ height: `${((x.avg || 0) / dmax) * 100}%`, minHeight: x.avg ? 3 : 0 }} />
                 <span className="text-xs text-neutral-500">{DAY_SHORT[w]}</span>
               </div>
             );
@@ -308,7 +308,7 @@ export default function Routes() {
 
       <div className="mb-4 flex gap-1 rounded-lg bg-neutral-100 p-1">
         {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={cn("flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition", tab === k ? "bg-white shadow-sm" : "text-neutral-500 hover:text-neutral-900")}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} className={cn("flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition", tab === k ? "bg-white shadow-sm" : "text-neutral-500 hover:text-brand")}>{l}</button>
         ))}
       </div>
 

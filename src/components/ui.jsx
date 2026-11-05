@@ -58,6 +58,6 @@ export const Badge = ({ tone = "gray", children }) => (
 
 export const Spinner = () => (
   <div className="flex h-screen items-center justify-center">
-    <div className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-900" />
+    <div className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-200 border-t-brand" />
   </div>
 );
