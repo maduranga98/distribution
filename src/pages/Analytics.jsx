@@ -59,8 +59,8 @@ function Overview({ a }) {
           <p className="mb-4 text-sm font-medium">Net sale by day</p>
           <div className="flex h-36 items-end gap-1 overflow-x-auto">
             {a.days.map((d) => (
-              <div key={d.date} className="flex min-w-[18px] flex-1 flex-col items-center gap-1" title={`${d.date} · ${money(d.net)}`}>
-                <div className="w-full rounded bg-brand" style={{ height: `${Math.max((Math.max(d.net, 0) / max) * 100, 2)}%` }} />
+              <div key={d.date} className="flex h-full min-w-[18px] flex-1 flex-col items-center gap-1" title={`${d.date} · ${money(d.net)}`}>
+                <div className="flex min-h-0 w-full flex-1 items-end"><div className="w-full rounded bg-brand" style={{ height: `${Math.max((Math.max(d.net, 0) / max) * 100, 2)}%` }} /></div>
                 <span className="text-[9px] text-neutral-400">{d.date.slice(8)}</span>
               </div>
             ))}
@@ -115,10 +115,10 @@ function Returns({ a }) {
   const byRoute = [...a.routes].filter((r) => r.returns > 0).sort((x, y) => y.returns - x.returns);
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Return value" value={money(a.marketValue)} tone={a.marketValue ? "bad" : undefined} />
         <Stat label="% of sale value" value={pct(a.returnRate)} />
-        <Stat label="Entries" value={a.returns.length} />
+        <Stat className="col-span-2 sm:col-span-1" label="Entries" value={a.returns.length} />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card">
@@ -218,9 +218,9 @@ export default function Analytics() {
         {!own && <>
         <button className="btn-ghost" onClick={() => { setFrom(monthStart()); setTo(today()); }}>This month</button>
         <button className="btn-ghost" onClick={() => { const [f, t] = lastMonth(); setFrom(f); setTo(t); }}>Last month</button>
-        <input type="date" className="input !w-36" value={from} onChange={(e) => setFrom(e.target.value || monthStart())} />
+        <input type="date" className="input min-w-[9rem] flex-1 sm:w-36 sm:flex-none" value={from} onChange={(e) => setFrom(e.target.value || monthStart())} />
         <span className="text-neutral-400">→</span>
-        <input type="date" className="input !w-36" value={to} onChange={(e) => setTo(e.target.value || today())} />
+        <input type="date" className="input min-w-[9rem] flex-1 sm:w-36 sm:flex-none" value={to} onChange={(e) => setTo(e.target.value || today())} />
         </>}
       </PageHeader>
       <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg bg-neutral-100 p-1">

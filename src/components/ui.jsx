@@ -6,17 +6,19 @@ export function Modal({ title, onClose, children, wide }) {
   useEffect(() => {
     const h = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; // no background scroll behind the sheet
+    return () => { window.removeEventListener("keydown", h); document.body.style.overflow = prev; };
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-0 sm:items-center sm:p-4" onMouseDown={onClose}>
       <div
         onMouseDown={(e) => e.stopPropagation()}
-        className={cn("max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl", wide ? "sm:max-w-2xl" : "sm:max-w-md")}
+        className={cn("max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl sm:rounded-2xl sm:p-5", wide ? "sm:max-w-2xl" : "sm:max-w-md")}
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded p-1 hover:bg-neutral-100"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="-mr-1 rounded p-2 hover:bg-neutral-100"><X size={18} /></button>
         </div>
         {children}
       </div>
@@ -29,19 +31,19 @@ export const Field = ({ label, children }) => (
 );
 
 export const PageHeader = ({ title, subtitle, children }) => (
-  <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+  <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
+    <div className="min-w-0">
+      <h1 className="text-lg font-semibold tracking-tight sm:text-xl">{title}</h1>
       {subtitle && <p className="text-sm text-neutral-500">{subtitle}</p>}
     </div>
-    <div className="flex flex-wrap items-center gap-2">{children}</div>
+    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{children}</div>
   </div>
 );
 
-export const Stat = ({ label, value, hint, tone }) => (
-  <div className="card p-4">
+export const Stat = ({ label, value, hint, tone, className }) => (
+  <div className={cn("card min-w-0 p-3 sm:p-4", className)}>
     <p className="text-xs font-medium text-neutral-500">{label}</p>
-    <p className={cn("mt-1 text-2xl font-semibold tracking-tight", tone === "bad" && "text-red-600", tone === "good" && "text-emerald-600")}>{value}</p>
+    <p className={cn("mt-1 break-words text-lg font-semibold tracking-tight sm:text-2xl", tone === "bad" && "text-red-600", tone === "good" && "text-emerald-600")}>{value}</p>
     {hint && <p className="mt-0.5 text-xs text-neutral-400">{hint}</p>}
   </div>
 );

@@ -37,9 +37,9 @@ export default function Dashboard() {
           <p className="mb-4 text-sm font-medium">Last 7 days · net sale</p>
           <div className="flex h-40 items-end gap-2">
             {days.map((x) => (
-              <div key={x.k} className="flex flex-1 flex-col items-center gap-1.5">
-                <span className="text-[10px] text-neutral-400">{x.v ? money(x.v).replace(/\.00$/, "") : ""}</span>
-                <div className="w-full rounded bg-brand" style={{ height: `${Math.max((Math.max(x.v, 0) / max) * 100, 2)}%`, opacity: x.k === t ? 1 : 0.2 }} />
+              <div key={x.k} className="flex h-full min-w-0 flex-1 flex-col items-center gap-1.5">
+                <span className="max-w-full truncate text-[9px] text-neutral-400 sm:text-[10px]">{x.v ? money(x.v).replace(/\.00$/, "") : ""}</span>
+                <div className="flex min-h-0 w-full flex-1 items-end"><div className="w-full rounded bg-brand" style={{ height: `${Math.max((Math.max(x.v, 0) / max) * 100, 2)}%`, opacity: x.k === t ? 1 : 0.2 }} /></div>
                 <span className="text-[10px] text-neutral-500">{x.label}</span>
               </div>
             ))}

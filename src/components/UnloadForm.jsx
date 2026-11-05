@@ -66,7 +66,7 @@ export default function UnloadForm({ run, onClose }) {
     <Modal title={`${run.status === "loaded" ? "Unload" : "Edit unloading"} · ${run.routeName}`} onClose={onClose} wide>
       <form onSubmit={save} className="space-y-6">
         <Section title="Vehicle meter">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Opening"><div className="input bg-neutral-50 text-neutral-500">{run.meterStart ?? "—"}</div></Field>
             <Field label="Closing">
               <input className={cn("input", meterBad && "!border-red-400")} type="number" inputMode="decimal" min="0" step="any" placeholder="Meter reading"
@@ -78,7 +78,7 @@ export default function UnloadForm({ run, onClose }) {
         </Section>
 
         <Section title="Items">
-          <div className="-mx-1 overflow-x-auto">
+          <div className="-mx-1 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[820px]">
               <thead><tr>
                 <th className="th !px-2">Item</th><th className="th !px-2 text-right">Price / pc</th><th className="th !px-2 text-right">Loaded</th>
@@ -104,6 +104,30 @@ export default function UnloadForm({ run, onClose }) {
               </tbody>
             </table>
           </div>
+          {/* phones & small tablets: one card per item instead of a wide table */}
+          <div className="space-y-3 md:hidden">
+            {calc.rows.map((r) => (
+              <div key={r.productId} className="rounded-lg border border-neutral-200 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 text-sm font-medium">{r.name}</p>
+                  <p className="shrink-0 text-xs text-neutral-500">{money(r.price)} / pc</p>
+                </div>
+                <p className="mt-0.5 text-xs text-neutral-500">Loaded {fmtQty(r.loaded, r.caseSize, r.unit)}</p>
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between gap-3"><span className="text-xs text-neutral-500">Unloaded</span>
+                    <QtyInput caseSize={r.caseSize} value={v[r.productId].returned} onChange={(x) => set(r.productId, "returned", x)} /></div>
+                  <div className="flex items-center justify-between gap-3"><span className="text-xs text-neutral-500">Free issue{guide(r) > 0 && <span className={cn("block text-[10px]", r.free > guide(r) ? "text-amber-600" : "text-neutral-400")}>guide {guide(r)} pcs</span>}</span>
+                    <QtyInput caseSize={r.caseSize} value={v[r.productId].free} onChange={(x) => set(r.productId, "free", x)} /></div>
+                  <div className="flex items-center justify-between gap-3"><span className="text-xs text-neutral-500">Market return</span>
+                    <QtyInput caseSize={r.caseSize} value={v[r.productId].marketReturn} onChange={(x) => set(r.productId, "marketReturn", x)} /></div>
+                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2 text-sm">
+                  <span className={cn(r.error && "text-red-600")}>Sold <b>{fmtQty(r.sold, r.caseSize, r.unit)}</b></span>
+                  <span>Net <b>{money(r.sales)}</b></span>
+                </div>
+              </div>
+            ))}
+          </div>
           <p className="text-xs text-neutral-400">Sold = Loaded − Unloaded (unloaded goes back to the warehouse). Free issues are part of sold but are not paid for, so they are left out of the sale value. Market return = goods taken back from shops; valued at the retail price and deducted from sales (not restocked).</p>
         </Section>
 
@@ -125,7 +149,7 @@ export default function UnloadForm({ run, onClose }) {
         </Section>
 
         <Section title="Collections & cash check">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Credit given today"><input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.credit} onChange={setC("credit")} /></Field>
             <Field label="Cheques received (today's sales)"><input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.cheques} onChange={setC("cheques")} /></Field>
             <Field label="Discounts given today"><input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.discount} onChange={setC("discount")} /></Field>

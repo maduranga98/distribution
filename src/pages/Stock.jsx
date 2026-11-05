@@ -149,7 +149,7 @@ function GrnForm({ onClose }) {
   return (
     <Modal title="Goods received (GRN)" onClose={onClose} wide>
       <form onSubmit={save} className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Date"><input type="date" className="input" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           <Field label="Supplier"><input className="input" value={supplier} onChange={(e) => setSupplier(e.target.value)} /></Field>
           <Field label="Invoice / ref"><input className="input" value={ref} onChange={(e) => setRef(e.target.value)} /></Field>
@@ -237,19 +237,19 @@ export default function Stock() {
         <button className="btn-primary" onClick={() => setModal({ t: "grn" })}><ClipboardList size={16} />New GRN</button>
       </PageHeader>
 
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Products" value={products.length} />
         <Stat label="On vehicles" value={van} hint="pcs, not yet unloaded" />
-        <Stat label="Stock value (MRP)" value={money(stockValue(products))} />
+        <Stat className="col-span-2 sm:col-span-1" label="Stock value (MRP)" value={money(stockValue(products))} />
       </div>
 
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex gap-1 overflow-x-auto rounded-lg bg-neutral-100 p-1 text-sm">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-neutral-100 p-1 text-sm">
           {[["stock", "Current stock"], ["ledger", "Ledger"], ["report", "Day stock report"], ["grn", "GRN history"], ["prices", "Price history"]].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className={cn("whitespace-nowrap rounded-md px-3 py-1.5", tab === k ? "bg-white shadow-sm" : "text-neutral-500")}>{l}</button>
           ))}
         </div>
-        {tab === "stock" && <input className="input !w-44" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />}
+        {tab === "stock" && <input className="input sm:!w-44" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />}
       </div>
 
       <div className="card overflow-x-auto">

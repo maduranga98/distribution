@@ -38,7 +38,7 @@ export default function Expenses() {
   return (
     <>
       <PageHeader title="Expenses" subtitle="Operating costs">
-        <input type="date" className="input !w-40" value={from} onChange={(e) => setFrom(e.target.value || monthStart())} />
+        <input type="date" className="input min-w-[9rem] flex-1 sm:w-40 sm:flex-none" value={from} onChange={(e) => setFrom(e.target.value || monthStart())} />
         <button className="btn-primary" onClick={() => setOpen(true)}><Plus size={16} />Expense</button>
       </PageHeader>
       <div className="mb-4 grid grid-cols-2 gap-3"><Stat label="Total since date" value={money(sum(list, (e) => e.amount))} /><Stat label="Entries" value={list.length} /></div>
