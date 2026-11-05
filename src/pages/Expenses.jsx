@@ -5,7 +5,7 @@ import { add, remove } from "../lib/db";
 import { monthStart, money, num, sum, today } from "../lib/utils";
 import { Badge, Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
 
-export const CATEGORIES = ["Fuel", "Salaries", "Rent", "Utilities", "Maintenance", "Marketing", "Other"];
+export const CATEGORIES = ["Fuel", "Salary", "Driver / Helper Wages", "Loading / Unloading", "Vehicle Maintenance", "Tolls / Parking", "Packing", "Rent", "Utilities", "Marketing", "Other"];
 
 function ExpenseForm({ onClose }) {
   const { uid } = useData();
@@ -52,7 +52,9 @@ export default function Expenses() {
                   <td className="td"><Badge>{e.category}</Badge></td>
                   <td className="td text-neutral-500">{e.note}</td>
                   <td className="td text-right font-medium">{money(e.amount)}</td>
-                  <td className="td text-right"><button className="rounded p-1.5 text-red-500 hover:bg-red-50" onClick={() => confirm("Delete expense?") && remove(uid, "expenses", e.id)}><Trash2 size={15} /></button></td>
+                  <td className="td text-right">{e.runId
+                    ? <span className="text-xs text-neutral-400" title="Recorded at unloading — edit it from Daily">{e.routeName || "Daily"}</span>
+                    : <button className="rounded p-1.5 text-red-500 hover:bg-red-50" onClick={() => confirm("Delete expense?") && remove(uid, "expenses", e.id)}><Trash2 size={15} /></button>}</td>
                 </tr>
               ))}
             </tbody>

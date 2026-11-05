@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { BarChart3, Boxes, LayoutDashboard, Receipt, Route, Wallet } from "lucide-react";
+import { BarChart3, Boxes, PieChart, LayoutDashboard, Receipt, Route, Wallet } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { Spinner } from "./ui";
 import BusinessSwitcher from "./BusinessSwitcher";
@@ -8,6 +8,7 @@ import { cn } from "../lib/utils";
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/daily", label: "Daily", icon: Route },
+  { to: "/analytics", label: "Analytics", icon: PieChart },
   { to: "/stock", label: "Inventory", icon: Boxes },
   { to: "/expenses", label: "Expenses", icon: Receipt },
   { to: "/accounting", label: "Accounts", icon: Wallet },
@@ -35,7 +36,7 @@ export default function Layout() {
           <BusinessSwitcher className="mb-5 md:hidden" />{loading ? <Spinner /> : <Outlet />}</div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-neutral-200 bg-white md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-neutral-200 bg-white md:hidden">
         {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === "/"}
             className={({ isActive }) => cn("flex flex-col items-center gap-0.5 py-2 text-[10px]", isActive ? "text-neutral-900" : "text-neutral-400")}>

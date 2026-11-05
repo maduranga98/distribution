@@ -23,3 +23,9 @@ export function fmtQty(n, caseSize, unit = "pcs") {
 
 /** Default profit margin (% of retail sales) when a business has none set. */
 export const DEFAULT_MARGIN = 6;
+
+/** Batch id for one save, e.g. 20261105-143015 (same format as the sheet). */
+export function batchId() {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}

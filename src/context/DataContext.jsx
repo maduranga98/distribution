@@ -7,7 +7,7 @@ import { DEFAULT_MARGIN, OWNER } from "../lib/utils";
 const Ctx = createContext(null);
 export const useData = () => useContext(Ctx);
 
-const NAMES = ["products", "expenses", "movements", "grns", "routes", "runs"];
+const NAMES = ["products", "expenses", "movements", "ledger", "priceLog", "grns", "routes", "runs"];
 
 export function DataProvider({ children }) {
   const { current } = useBusiness();
@@ -36,7 +36,7 @@ export function DataProvider({ children }) {
       margin: Number.isFinite(current.margin) ? current.margin : DEFAULT_MARGIN, // profit % of MRP
       loading: NAMES.some((n) => !ready[n]),
       products: g("products"),
-      expenses: g("expenses"), movements: g("movements"), grns: g("grns"), routes: g("routes"), runs: g("runs"),
+      expenses: g("expenses"), movements: g("movements"), ledger: g("ledger"), priceLog: g("priceLog"), grns: g("grns"), routes: g("routes"), runs: g("runs"),
     };
   }, [data, ready, base, current.margin]);
 
