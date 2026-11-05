@@ -20,3 +20,6 @@ export function fmtQty(n, caseSize, unit = "pcs") {
   const parts = [c && `${c} cs`, (r || !c) && `${r} ${unit}`].filter(Boolean).join(" ");
   return sign + parts;
 }
+
+/** Default profit margin (% of MRP) when a business has none set. */
+export const DEFAULT_MARGIN = 6;

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useBusiness } from "./BusinessContext";
-import { OWNER } from "../lib/utils";
+import { DEFAULT_MARGIN, OWNER } from "../lib/utils";
 
 const Ctx = createContext(null);
 export const useData = () => useContext(Ctx);
@@ -33,11 +33,12 @@ export function DataProvider({ children }) {
     const g = (n) => data[n] || [];
     return {
       uid: base, // data path prefix for the active business
+      margin: Number.isFinite(current.margin) ? current.margin : DEFAULT_MARGIN, // profit % of MRP
       loading: NAMES.some((n) => !ready[n]),
       products: g("products"),
       expenses: g("expenses"), movements: g("movements"), grns: g("grns"), routes: g("routes"), runs: g("runs"),
     };
-  }, [data, ready, base]);
+  }, [data, ready, base, current.margin]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

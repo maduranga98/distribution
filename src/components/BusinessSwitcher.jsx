@@ -2,20 +2,22 @@ import { useState } from "react";
 import { Check, ChevronsUpDown, Pencil, Plus } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { Field, Modal } from "./ui";
-import { cn } from "../lib/utils";
+import { DEFAULT_MARGIN, cn, num } from "../lib/utils";
 
 function NameForm({ business, onClose }) {
-  const { create, rename } = useBusiness();
+  const { create, update } = useBusiness();
   const [name, setName] = useState(business?.name || "");
+  const [margin, setMargin] = useState(String(business?.margin ?? DEFAULT_MARGIN));
   const save = async (e) => {
     e.preventDefault();
-    business ? await rename(business.id, name) : await create(name);
+    business ? await update(business.id, name, num(margin)) : await create(name, num(margin));
     onClose();
   };
   return (
-    <Modal title={business ? "Rename business" : "New business"} onClose={onClose}>
+    <Modal title={business ? "Edit business" : "New business"} onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
         <Field label="Name"><input className="input" required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Profit margin (% of MRP)"><input className="input" type="number" step="any" min="0" max="100" required value={margin} onChange={(e) => setMargin(e.target.value)} /></Field>
         <button className="btn-primary w-full">Save</button>
       </form>
     </Modal>
@@ -42,7 +44,7 @@ export default function BusinessSwitcher({ className }) {
               </button>
             ))}
             <div className="my-1 border-t border-neutral-100" />
-            <button onClick={() => { setModal({ b: current }); setOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"><Pencil size={14} />Rename current</button>
+            <button onClick={() => { setModal({ b: current }); setOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"><Pencil size={14} />Edit current</button>
             <button onClick={() => { setModal({}); setOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"><Plus size={14} />New business</button>
           </div>
         </>

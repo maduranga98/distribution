@@ -21,11 +21,11 @@ export function BusinessProvider({ children }) {
     return {
       list, current, loading: list === null,
       select: (id) => { setCurrentId(id); try { localStorage.setItem(key, id); } catch { /* ignore */ } },
-      create: async (name) => {
-        const r = await addDoc(collection(db, `users/${OWNER}/businesses`), { name: name.trim(), createdAt: serverTimestamp() });
+      create: async (name, margin) => {
+        const r = await addDoc(collection(db, `users/${OWNER}/businesses`), { name: name.trim(), margin, createdAt: serverTimestamp() });
         setCurrentId(r.id); try { localStorage.setItem(key, r.id); } catch { /* ignore */ }
       },
-      rename: (id, name) => updateDoc(doc(db, `users/${OWNER}/businesses/${id}`), { name: name.trim() }),
+      update: (id, name, margin) => updateDoc(doc(db, `users/${OWNER}/businesses/${id}`), { name: name.trim(), margin }),
     };
   }, [list, currentId]);
 
