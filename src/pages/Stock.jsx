@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ClipboardList, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { LedgerView, DayReportView, PriceLogView } from "../components/StockViews";
 import { useData } from "../context/DataContext";
-import { add, adjustStock, createGrn, deleteGrn, deleteProduct, update } from "../lib/db";
+import { adjustStock, createGrn, createProduct, deleteGrn, deleteProduct, saveProduct } from "../lib/db";
 import { onVehicle, stockValue } from "../lib/accounts";
 import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
 import { Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
@@ -10,14 +11,20 @@ import QtyInput from "../components/QtyInput";
 
 function ProductForm({ product, onClose }) {
   const { uid } = useData();
-  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", caseSize: "", cost: "", price: "", minStock: "", stock: "", ...product });
+  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", caseSize: "", cost: "", price: "", minStock: "", stock: "", freeEvery: "", ...product });
+  const [error, setError] = useState("");
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = async (e) => {
     e.preventDefault();
-    const data = { name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", caseSize: num(f.caseSize) > 1 ? num(f.caseSize) : 0, cost: num(f.cost), minStock: num(f.minStock) };
-    if (product) await update(uid, "products", product.id, data); // price changes go through GRN
-    else await add(uid, "products", { ...data, price: num(f.price), priceHistory: [], stock: num(f.stock) });
-    onClose();
+    const data = {
+      name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", caseSize: num(f.caseSize) > 1 ? num(f.caseSize) : 0,
+      cost: num(f.cost), minStock: num(f.minStock), freeEvery: num(f.freeEvery) > 0 ? num(f.freeEvery) : 0,
+    };
+    try {
+      if (product) await saveProduct(uid, product, data, num(f.price));
+      else await createProduct(uid, { ...data, price: num(f.price), priceHistory: [], stock: num(f.stock) });
+      onClose();
+    } catch (err) { setError(err.message); }
   };
   return (
     <Modal title={product ? "Edit product" : "New product"} onClose={onClose}>
@@ -27,38 +34,60 @@ function ProductForm({ product, onClose }) {
         <Field label="Unit"><input className="input" value={f.unit} onChange={set("unit")} /></Field>
         <div className="col-span-2"><Field label="Pieces per case (blank if not sold in cases)"><input className="input" type="number" step="1" min="0" placeholder="e.g. 48" value={f.caseSize || ""} onChange={set("caseSize")} /></Field></div>
         <Field label="MRP (per piece)"><input className="input" type="number" step="any" min="0" required value={f.cost} onChange={set("cost")} /></Field>
-        {!product && <Field label="Retail price (per piece)"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>}
+        <Field label="List / retail price (per piece)"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>
         {!product && <Field label="Opening stock"><QtyInput caseSize={f.caseSize} value={String(f.stock)} onChange={(v) => setF({ ...f, stock: v })} /></Field>}
         <Field label="Low-stock alert at"><input className="input" type="number" step="any" min="0" value={f.minStock} onChange={set("minStock")} /></Field>
-        {product && <p className="col-span-2 text-xs text-neutral-400">Retail price is changed when receiving stock (GRN).</p>}
+        <div className="col-span-2"><Field label="Free issue guide: 1 free per … pcs sold (blank if none)"><input className="input" type="number" step="any" min="0" placeholder="e.g. 12" value={f.freeEvery || ""} onChange={set("freeEvery")} /></Field></div>
+        {product && <p className="col-span-2 text-xs text-neutral-400">Price changes are recorded in Price history.</p>}
+        {error && <p className="col-span-2 text-sm text-red-600">{error}</p>}
         <button className="btn-primary col-span-2 mt-2">Save</button>
       </form>
     </Modal>
   );
 }
 
-function AdjustForm({ product, onClose }) {
-  const { uid } = useData();
+/** Add or release stock (damage, count correction, opening balance…). Shows in the Ledger. */
+function StockEntryForm({ product, onClose }) {
+  const { uid, products } = useData();
+  const [pid, setPid] = useState(product?.id || "");
+  const p = products.find((x) => x.id === pid);
+  const [date, setDate] = useState(today());
   const [qty, setQty] = useState("");
-  const [sign, setSign] = useState(-1);
+  const [sign, setSign] = useState(1);
+  const [cost, setCost] = useState(product ? String(product.cost) : "");
   const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const save = async (e) => {
     e.preventDefault();
-    if (!num(qty)) return;
-    await adjustStock(uid, { productId: product.id, productName: product.name, qty: sign * num(qty), date: today(), note: note.trim() });
-    onClose();
+    if (!p || !num(qty)) return setError("Pick an item and enter a quantity");
+    setBusy(true); setError("");
+    try {
+      await adjustStock(uid, { productId: p.id, qty: sign * num(qty), date, unitCost: num(cost), note: note.trim() });
+      onClose();
+    } catch (err) { setError(err.message); setBusy(false); }
   };
   return (
-    <Modal title={`Adjust · ${product.name}`} onClose={onClose}>
+    <Modal title="Stock entry" onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
         <div className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1 text-sm">
-          {[[-1, "Remove (damaged…)"], [1, "Add"]].map(([k, l]) => (
+          {[[1, "Add"], [-1, "Release"]].map(([k, l]) => (
             <button type="button" key={k} onClick={() => setSign(k)} className={cn("rounded-md py-1.5", sign === k ? "bg-white shadow-sm" : "text-neutral-500")}>{l}</button>
           ))}
         </div>
-        <Field label={`Quantity · in stock ${fmtQty(product.stock, product.caseSize, product.unit)}`}><QtyInput autoFocus caseSize={product.caseSize} value={qty} onChange={setQty} /></Field>
-        <Field label="Reason"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Damaged, count correction…" /></Field>
-        <button className="btn-primary w-full">Save adjustment</button>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date"><input type="date" className="input" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Unit cost (per pc)"><input className="input" type="number" step="any" min="0" value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
+        </div>
+        <Field label="Item">
+          <select className="input" value={pid} onChange={(e) => { setPid(e.target.value); setCost(String(products.find((x) => x.id === e.target.value)?.cost ?? "")); }}>
+            <option value="">Select item…</option>{products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        </Field>
+        <Field label={p ? `Quantity · in stock ${fmtQty(p.stock, p.caseSize, p.unit)}` : "Quantity"}><QtyInput caseSize={p?.caseSize} value={qty} onChange={setQty} /></Field>
+        <Field label="Note"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Opening stock, damaged, count correction…" /></Field>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button className="btn-primary w-full" disabled={busy}>Save stock entry</button>
       </form>
     </Modal>
   );
@@ -204,6 +233,7 @@ export default function Stock() {
     <>
       <PageHeader title="Inventory" subtitle="Stock, goods received and prices">
         <button className="btn-ghost" onClick={() => setModal({ t: "product" })}><Plus size={16} />Product</button>
+        <button className="btn-ghost" onClick={() => setModal({ t: "adjust" })}><SlidersHorizontal size={16} />Stock entry</button>
         <button className="btn-primary" onClick={() => setModal({ t: "grn" })}><ClipboardList size={16} />New GRN</button>
       </PageHeader>
 
@@ -214,16 +244,16 @@ export default function Stock() {
       </div>
 
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1 text-sm">
-          {[["stock", "Current stock"], ["grn", "GRN history"]].map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)} className={cn("rounded-md px-3 py-1.5", tab === k ? "bg-white shadow-sm" : "text-neutral-500")}>{l}</button>
+        <div className="flex gap-1 overflow-x-auto rounded-lg bg-neutral-100 p-1 text-sm">
+          {[["stock", "Current stock"], ["ledger", "Ledger"], ["report", "Day stock report"], ["grn", "GRN history"], ["prices", "Price history"]].map(([k, l]) => (
+            <button key={k} onClick={() => setTab(k)} className={cn("whitespace-nowrap rounded-md px-3 py-1.5", tab === k ? "bg-white shadow-sm" : "text-neutral-500")}>{l}</button>
           ))}
         </div>
         {tab === "stock" && <input className="input !w-44" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />}
       </div>
 
       <div className="card overflow-x-auto">
-        {tab === "grn" ? <GrnList /> : (
+        {tab === "grn" ? <GrnList /> : tab === "ledger" ? <LedgerView /> : tab === "report" ? <DayReportView /> : tab === "prices" ? <PriceLogView /> : (
           <StockTable products={list} actions={(p) => (<>
             <button title="Adjust stock" className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setModal({ t: "adjust", p })}><SlidersHorizontal size={15} /></button>
             <button title="Edit" className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setModal({ t: "product", p })}><Pencil size={15} /></button>
@@ -233,7 +263,7 @@ export default function Stock() {
       </div>
 
       {modal?.t === "product" && <ProductForm product={modal.p} onClose={() => setModal(null)} />}
-      {modal?.t === "adjust" && <AdjustForm product={modal.p} onClose={() => setModal(null)} />}
+      {modal?.t === "adjust" && <StockEntryForm product={modal.p} onClose={() => setModal(null)} />}
       {modal?.t === "grn" && <GrnForm onClose={() => setModal(null)} />}
     </>
   );

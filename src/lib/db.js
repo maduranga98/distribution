@@ -4,11 +4,21 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { calcCash, calcDistance, calcRun } from "./runs";
-import { num } from "./utils";
+import { batchId, num, today } from "./utils";
 
 const col = (base, name) => collection(db, `users/${base}/${name}`);
 const ref = (base, name, id) => doc(db, `users/${base}/${name}/${id}`);
 const stamp = (d) => ({ ...d, createdAt: serverTimestamp() });
+
+/** One stock-ledger row. qty is always positive; type says the direction. */
+const ledgerRow = (base, tx, p, e) =>
+  tx.set(doc(col(base, "ledger")), stamp({
+    date: e.date || today(), productId: p.id, name: p.name, unit: p.unit, caseSize: p.caseSize || 0,
+    type: e.type, qty: Math.abs(e.qty), unitCost: e.unitCost ?? p.cost ?? 0, note: e.note || "",
+    before: e.before, after: e.after,
+  }));
+const priceRow = (base, tx, p, oldPrice, newPrice, source) =>
+  tx.set(doc(col(base, "priceLog")), stamp({ date: today(), productId: p.id, name: p.name, oldPrice, newPrice, source }));
 
 export const add = (base, name, data) => addDoc(col(base, name), stamp(data));
 export const update = (base, name, id, data) => updateDoc(ref(base, name, id), data);
@@ -18,12 +28,42 @@ export async function deleteProduct(base, id) {
   await deleteDoc(ref(base, "products", id));
 }
 
-/** Manual stock adjustment (+/-), e.g. damaged or counted difference. */
-export async function adjustStock(base, m) {
+/** New product, with an "Opening stock" ledger row and the first price-history entry. */
+export async function createProduct(base, data) {
+  const pRef = doc(col(base, "products"));
   const batch = writeBatch(db);
-  batch.update(ref(base, "products", m.productId), { stock: increment(m.qty) });
-  batch.set(doc(col(base, "movements")), stamp({ ...m, type: "adjust" }));
+  batch.set(pRef, stamp(data));
+  const p = { id: pRef.id, ...data };
+  const tx = { set: (r, d) => batch.set(r, d) };
+  if (data.stock > 0) ledgerRow(base, tx, p, { type: "Add", qty: data.stock, before: 0, after: data.stock, note: "Opening stock" });
+  priceRow(base, tx, p, null, data.price, "New");
   await batch.commit();
+}
+
+/** Edit a product; a changed retail price is remembered and logged. */
+export async function saveProduct(base, product, data, price) {
+  const batch = writeBatch(db);
+  const patch = { ...data };
+  if (price !== product.price) {
+    patch.price = price;
+    patch.priceHistory = [product.price, ...(product.priceHistory || [])].filter((v, k, a) => v !== price && a.indexOf(v) === k).slice(0, 6);
+    priceRow(base, { set: (r, d) => batch.set(r, d) }, product, product.price, price, "Edit");
+  }
+  batch.update(ref(base, "products", product.id), patch);
+  await batch.commit();
+}
+
+/** Stock entry: add (+qty) or release (−qty) with a reason. Recorded in the ledger with on-hand before/after. */
+export async function adjustStock(base, m) {
+  const pRef = ref(base, "products", m.productId);
+  await runTransaction(db, async (tx) => {
+    const s = await tx.get(pRef);
+    if (!s.exists()) throw new Error("Product no longer exists");
+    const p = { id: s.id, ...s.data() }, before = p.stock, after = before + m.qty;
+    if (after < 0) throw new Error(`Only ${before} in stock`);
+    tx.update(pRef, { stock: increment(m.qty) });
+    ledgerRow(base, tx, p, { date: m.date, type: m.qty >= 0 ? "Add" : "Release", qty: m.qty, unitCost: m.unitCost, note: m.note, before, after });
+  });
 }
 
 /**
@@ -43,6 +83,9 @@ export async function createGrn(base, grn) {
         patch.priceHistory = [p.price, ...(p.priceHistory || [])].filter((v, k, a) => v !== i.price && a.indexOf(v) === k).slice(0, 6);
       }
       tx.update(s.ref, patch);
+      const pr = { id: s.id, ...p };
+      ledgerRow(base, tx, pr, { date: grn.date, type: "Add", qty: i.qty, unitCost: i.cost, before: p.stock, after: p.stock + i.qty, note: `GRN${grn.ref ? ` ${grn.ref}` : ""}${grn.supplier ? ` · ${grn.supplier}` : ""}` });
+      if (i.price !== p.price) priceRow(base, tx, pr, p.price, i.price, "GRN");
     });
     tx.set(grnRef, stamp(grn));
   });
@@ -57,7 +100,12 @@ export async function deleteGrn(base, grn) {
       const i = grn.items[idx];
       if (s.exists() && s.data().stock < i.qty) throw new Error(`Can't remove: "${i.name}" has only ${s.data().stock} in stock`);
     });
-    snaps.forEach((s, idx) => s.exists() && tx.update(s.ref, { stock: increment(-grn.items[idx].qty) }));
+    snaps.forEach((s, idx) => {
+      if (!s.exists()) return;
+      const i = grn.items[idx], p = { id: s.id, ...s.data() };
+      tx.update(s.ref, { stock: increment(-i.qty) });
+      ledgerRow(base, tx, p, { type: "Release", qty: i.qty, unitCost: i.cost, before: p.stock, after: p.stock - i.qty, note: "GRN deleted" });
+    });
     tx.delete(ref(base, "grns", grn.id));
   });
 }
@@ -69,15 +117,18 @@ export async function deleteGrn(base, grn) {
 export async function saveLoading(base, run, runId) {
   const runRef = runId ? ref(base, "runs", runId) : doc(col(base, "runs"));
   await runTransaction(db, async (tx) => {
-    let old = {};
+    let old = {}, oldOpen = {};
     if (runId) {
       const s = await tx.get(runRef);
       if (!s.exists() || s.data().status !== "loaded") throw new Error("This loading is already unloaded and can't be edited");
-      s.data().items.forEach((i) => (old[i.productId] = i.loaded));
+      s.data().items.forEach((i) => { old[i.productId] = i.loaded; oldOpen[i.productId] = i.opening; });
     }
     const now = Object.fromEntries(run.items.map((i) => [i.productId, i.loaded]));
     const ids = [...new Set([...Object.keys(old), ...Object.keys(now)])];
     const snaps = await Promise.all(ids.map((id) => tx.get(ref(base, "products", id))));
+    const stockNow = Object.fromEntries(snaps.map((s, k) => [ids[k], s.exists() ? s.data().stock : 0]));
+    // warehouse stock before this loading took its share (kept when editing, for the Day Stock Report)
+    const data = { ...run, items: run.items.map((i) => ({ ...i, opening: oldOpen[i.productId] ?? stockNow[i.productId] })) };
     snaps.forEach((s, k) => {
       const delta = (now[ids[k]] || 0) - (old[ids[k]] || 0);
       if (!delta) return;
@@ -85,7 +136,7 @@ export async function saveLoading(base, run, runId) {
       if (delta > 0 && s.data().stock < delta) throw new Error(`Not enough stock for "${s.data().name}" (available ${s.data().stock})`);
       tx.update(s.ref, { stock: increment(-delta) });
     });
-    if (runId) tx.update(runRef, run); else tx.set(runRef, stamp({ ...run, status: "loaded" }));
+    if (runId) tx.update(runRef, data); else tx.set(runRef, stamp({ ...data, status: "loaded", batchId: batchId() }));
   });
   return runRef.id;
 }
