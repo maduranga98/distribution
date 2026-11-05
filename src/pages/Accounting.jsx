@@ -25,9 +25,9 @@ export default function Accounting() {
   return (
     <>
       <PageHeader title="Accounts" subtitle="Profit & loss and purchases">
-        <input type="date" className="input !w-40" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date" className="input min-w-[9rem] flex-1 sm:w-40 sm:flex-none" value={from} onChange={(e) => setFrom(e.target.value)} />
         <span className="text-neutral-400">→</span>
-        <input type="date" className="input !w-40" value={to} onChange={(e) => setTo(e.target.value)} />
+        <input type="date" className="input min-w-[9rem] flex-1 sm:w-40 sm:flex-none" value={to} onChange={(e) => setTo(e.target.value)} />
       </PageHeader>
 
       <div className="card mb-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -35,7 +35,7 @@ export default function Accounting() {
           <p className="text-sm font-medium">Profit margin</p>
           <p className="text-xs text-neutral-400">% of retail sales for {current.name}. Cost of goods = retail sales − margin.</p>
         </div>
-        <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); update(current.id, current.name, num(m)); }}>
+        <form className="flex w-full items-center gap-2 sm:w-auto" onSubmit={(e) => { e.preventDefault(); update(current.id, current.name, num(m)); }}>
           <input className="input !w-24 text-right" type="number" step="any" min="0" max="100" required value={m} onChange={(e) => setM(e.target.value)} />
           <span className="text-sm text-neutral-500">%</span>
           <button className="btn-primary" disabled={num(m) === d.margin}>Save</button>

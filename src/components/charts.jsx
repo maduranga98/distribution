@@ -35,7 +35,7 @@ export function Donut({ data, center }) {
 }
 
 /** Thin horizontal share bar. */
-export const Bar = ({ pct, color = "#171717" }) => (
+export const Bar = ({ pct, color = "#001948" }) => (
   <div className="h-1.5 w-full rounded-full bg-neutral-100">
     <div className="h-full rounded-full" style={{ width: `${Math.min(Math.max(pct, 0), 100)}%`, background: color }} />
   </div>

@@ -73,8 +73,8 @@ export function YearTracker() {
         <p className="mb-4 text-sm font-medium">Net sales by month</p>
         <div className="flex h-36 items-end gap-2">
           {t.months.map((x) => (
-            <div key={x.label} className="flex flex-1 flex-col items-center gap-1" title={`${x.label} · ${money(x.net)}`}>
-              <div className="w-full rounded bg-neutral-900" style={{ height: `${Math.max((Math.max(x.net, 0) / max) * 100, 2)}%`, opacity: x.runs ? 1 : 0.15 }} />
+            <div key={x.label} className="flex h-full flex-1 flex-col items-center gap-1" title={`${x.label} · ${money(x.net)}`}>
+              <div className="flex min-h-0 w-full flex-1 items-end"><div className="w-full rounded bg-brand" style={{ height: `${Math.max((Math.max(x.net, 0) / max) * 100, 2)}%`, opacity: x.runs ? 1 : 0.15 }} /></div>
               <span className="text-[10px] text-neutral-500">{x.label}</span>
             </div>
           ))}

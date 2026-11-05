@@ -48,7 +48,7 @@ function LoadForm({ date, run, onClose }) {
   return (
     <Modal title={run ? "Edit loading" : "Load route"} onClose={onClose} wide>
       <form onSubmit={save} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Date"><input type="date" className="input" required value={d} onChange={(e) => setD(e.target.value)} /></Field>
           <Field label={`Route · visit ${visit}`}>
             <select className="input" required value={routeId} onChange={(e) => setRouteId(e.target.value)}>
@@ -90,9 +90,9 @@ function RunCard({ run, onEdit, onUnload }) {
   const done = run.status !== "loaded";
   return (
     <div className="card">
-      <div className="flex flex-wrap items-center gap-3 p-4">
-        <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(!open)}>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 p-3 sm:gap-3 sm:p-4">
+        <button className="min-w-0 basis-full text-left sm:basis-0 sm:flex-1" onClick={() => setOpen(!open)}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="truncate font-medium">{run.routeName}</span>
             {run.visit > 1 && <span className="text-xs text-neutral-400">visit {run.visit}</span>}
             <Badge tone={done ? "green" : "amber"}>{done ? "Unloaded" : "On the road"}</Badge>
@@ -116,7 +116,7 @@ function RunCard({ run, onEdit, onUnload }) {
           <button className="rounded p-1.5 text-red-500 hover:bg-red-50" title="Cancel loading & restock"
             onClick={() => confirm("Cancel this loading and return everything to the warehouse?") && cancelLoading(uid, run)}><Trash2 size={15} /></button>
         </>}
-        <ChevronDown size={16} className={cn("text-neutral-400 transition", open && "rotate-180")} />
+        <ChevronDown size={16} className={cn("ml-auto text-neutral-400 transition", open && "rotate-180")} />
       </div>
       {open && (
         <div className="overflow-x-auto border-t border-neutral-100">
@@ -163,7 +163,7 @@ export default function Daily() {
         <Stat label="Pieces sold" value={t("sold")} hint="loaded − unloaded" />
         <Stat label="Sale value" value={money(t("gross"))} />
         <Stat label="Market returns" value={`−${money(t("marketValue"))}`} tone={t("marketValue") ? "bad" : undefined} />
-        <Stat label="Net sale" value={money(t("sales"))} tone="good" />
+        <Stat className="col-span-2 sm:col-span-1" label="Net sale" value={money(t("sales"))} tone="good" />
       </div>
 
       <div className="space-y-3">
