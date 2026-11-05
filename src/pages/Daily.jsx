@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Boxes, ChevronDown, MapPin, PackageCheck, PackageMinus, Pencil, Trash2 } from "lucide-react";
+import { Boxes, ChevronDown, FileText, MapPin, PackageCheck, PackageMinus, Pencil, Trash2 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { cancelLoading, saveLoading } from "../lib/db";
 import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
@@ -104,7 +104,7 @@ function RunCard({ run, onEdit, onUnload }) {
           </p>
           {done && run.collection && (
             <p className="mt-0.5 text-xs text-neutral-500">
-              Expenses {money(run.collection.expenses)} · credit {money(run.collection.credit)} · cheques {money(run.collection.cheques)}
+              Expenses {money(run.collection.expenses)} · credit {money(run.collection.credit)} · cheques {money(run.collection.cheques)}{run.collection.discount > 0 && ` · discount ${money(run.collection.discount)}`}
               {run.collection.difference != null && <> · <span className={run.collection.difference < 0 ? "text-red-600" : "text-emerald-600"}>
                 {run.collection.difference < 0 ? "short" : "excess"} {money(Math.abs(run.collection.difference))}</span></>}
             </p>
@@ -153,6 +153,7 @@ export default function Daily() {
       <PageHeader title="Daily" subtitle="Loading, unloading & sales">
         <input type="date" className="input !w-40" value={date} onChange={(e) => setDate(e.target.value || today())} />
         <button className="btn-ghost" onClick={() => setModal({ t: "stock" })}><Boxes size={16} />Current stock</button>
+        <Link to="/daily/report" className="btn-ghost"><FileText size={16} />Day report</Link>
         <Link to="/routes" className="btn-ghost"><MapPin size={16} />Routes</Link>
         <button className="btn-primary" onClick={() => setModal({ t: "load" })}><PackageMinus size={16} />Load route</button>
       </PageHeader>
