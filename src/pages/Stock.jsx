@@ -10,7 +10,7 @@ import StockTable from "../components/StockTable";
 import QtyInput from "../components/QtyInput";
 
 function ProductForm({ product, onClose }) {
-  const { uid } = useData();
+  const { uid, products } = useData();
   const [f, setF] = useState({ name: "", sku: "", unit: "pcs", caseSize: "", cost: "", price: "", minStock: "", stock: "", freeEvery: "", ...product });
   const [error, setError] = useState("");
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
