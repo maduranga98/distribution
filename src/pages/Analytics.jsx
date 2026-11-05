@@ -7,7 +7,7 @@ import { Bar, Donut } from "../components/charts";
 import { Badge, Empty, PageHeader, Stat } from "../components/ui";
 import { CashLog, MonthSummary, YearTracker } from "./Reports";
 
-const TABS = [["overview", "Overview"], ["items", "Items"], ["returns", "Market returns"], ["routes", "Routes & trips"], ["cash", "Cash log"], ["month", "Month summary"], ["year", "Year tracker"]];
+const TABS = [["overview", "Overview"], ["items", "Items"], ["returns", "Market returns"], ["routes", "Routes & trips"], ["cash", "Cash log"], ["month", "Month summary"], ["year", "Year tracker"], ["insights", "Insights"]];
 const SORTS = { net: "Net sales", sold: "Pieces sold", sellThrough: "Sell-through", returnRate: "Return rate" };
 const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 const km = (n) => (n == null ? "—" : `${+n.toFixed(1)} km`);
@@ -162,6 +162,48 @@ function Returns({ a }) {
   );
 }
 
+const daysBetween = (from, to) => Math.max(Math.round((new Date(to) - new Date(from)) / 864e5) + 1, 1);
+
+/** Actionable lists: best sellers, slow movers, high returns and stock cover (days left at the current selling pace). */
+function Insights({ a, from, to }) {
+  const { products } = useData();
+  const days = daysBetween(from, to);
+  const top = [...a.items].sort((x, y) => y.net - x.net).slice(0, 5);
+  const slow = [...a.items].filter((i) => i.loaded > 0).sort((x, y) => x.sellThrough - y.sellThrough).slice(0, 5);
+  const returns = [...a.items].filter((i) => i.marketQty > 0).sort((x, y) => y.returnRate - x.returnRate).slice(0, 5);
+  const sold = Object.fromEntries(a.items.map((i) => [i.id, i.sold]));
+  const cover = products.map((p) => {
+    const daily = (sold[p.id] || 0) / days;
+    return { p, daily, left: daily > 0 ? p.stock / daily : null };
+  }).filter((x) => x.daily > 0).sort((x, y) => x.left - y.left);
+  const List = ({ title, hint, rows }) => (
+    <div className="card">
+      <p className="px-4 pt-3 text-sm font-medium">{title}</p><p className="px-4 pb-2 text-xs text-neutral-400">{hint}</p>
+      {rows.length === 0 ? <Empty>No data</Empty> : <ul className="divide-y divide-neutral-100">{rows.map(([k, name, right]) => <li key={k} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"><span className="truncate">{name}</span><span className="shrink-0 text-neutral-500">{right}</span></li>)}</ul>}
+    </div>
+  );
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <List title="Best sellers" hint="Highest net sales" rows={top.map((i) => [i.id, i.name, money(i.net)])} />
+      <List title="Slow movers" hint="Lowest sell-through (sold ÷ loaded) — load less, or check pricing" rows={slow.map((i) => [i.id, i.name, <Badge key="b" tone="amber">{pct(i.sellThrough)}</Badge>])} />
+      <List title="Highest return rate" hint="Market returns as % of pieces sold" rows={returns.map((i) => [i.id, i.name, <span key="r" className="text-red-600">{pct(i.returnRate)}</span>])} />
+      <div className="card">
+        <p className="px-4 pt-3 text-sm font-medium">Stock cover</p><p className="px-4 pb-2 text-xs text-neutral-400">Days of stock left at this period's selling pace ({days} days)</p>
+        {cover.length === 0 ? <Empty>No sales in this period</Empty> : (
+          <ul className="divide-y divide-neutral-100">
+            {cover.slice(0, 8).map(({ p, left }) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <span className="truncate">{p.name}</span>
+                <span className="flex shrink-0 items-center gap-2 text-neutral-500">{fmtQty(p.stock, p.caseSize, p.unit)}<Badge tone={left < 3 ? "red" : left < 7 ? "amber" : "green"}>{left < 1 ? "<1" : Math.round(left)} d</Badge></span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Routes({ a }) {
   return (
     <div className="space-y-4">
@@ -228,7 +270,7 @@ export default function Analytics() {
           <button key={k} onClick={() => setTab(k)} className={cn("flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition", tab === k ? "bg-white shadow-sm" : "text-neutral-500 hover:text-neutral-900")}>{l}</button>
         ))}
       </div>
-      {tab === "cash" ? <CashLog /> : tab === "month" ? <MonthSummary /> : tab === "year" ? <YearTracker /> : <View a={a} />}
+      {tab === "insights" ? <Insights a={a} from={from} to={to} /> : tab === "cash" ? <CashLog /> : tab === "month" ? <MonthSummary /> : tab === "year" ? <YearTracker /> : <View a={a} />}
     </>
   );
 }

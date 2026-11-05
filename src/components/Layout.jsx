@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { BarChart3, Boxes, PieChart, LayoutDashboard, Receipt, Route, Wallet } from "lucide-react";
+import { BarChart3, BookOpen, Boxes, PieChart, LayoutDashboard, Receipt, Route, Wallet } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { Spinner } from "./ui";
 import BusinessSwitcher from "./BusinessSwitcher";
@@ -29,6 +29,9 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        <NavLink to="/guide" className={({ isActive }) => cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm", isActive ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100")}>
+          <BookOpen size={16} />Start here
+        </NavLink>
       </aside>
 
       <main className="min-w-0 flex-1 p-4 pb-24 md:p-8">

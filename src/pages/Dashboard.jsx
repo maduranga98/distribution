@@ -22,6 +22,7 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader title="Dashboard" subtitle={new Date().toLocaleDateString("en-US", { dateStyle: "full" })}>
+        <Link to="/guide" className="btn-ghost">Start here</Link>
         <Link to="/daily" className="btn-primary">Daily loading</Link>
       </PageHeader>
 
