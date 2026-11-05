@@ -12,6 +12,7 @@ import Stock from "./pages/Stock";
 import Expenses from "./pages/Expenses";
 import Accounting from "./pages/Accounting";
 import Daily from "./pages/Daily";
+import DayReport from "./pages/DayReport";
 import Analytics from "./pages/Analytics";
 import Routes_ from "./pages/Routes";
 
@@ -25,6 +26,7 @@ function Shell() {
         <Route element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="daily" element={<Daily />} />
+          <Route path="daily/report" element={<DayReport />} />
           <Route path="routes" element={<Routes_ />} />
           <Route path="stock" element={<Stock />} />
           <Route path="analytics" element={<Analytics />} />

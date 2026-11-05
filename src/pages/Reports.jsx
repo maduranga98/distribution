@@ -113,21 +113,21 @@ export function CashLog() {
       <MonthPicker {...{ y, m, setY, setM }} />
       <div className="card overflow-x-auto">
         {rows.length === 0 ? <Empty>No unloaded runs this month</Empty> : (
-          <table className="w-full min-w-[900px]">
-            <thead><tr><th className="th">Date</th><th className="th text-right">Net sales</th><th className="th text-right">Returns</th><th className="th text-right">Credit</th><th className="th text-right">Cheques</th>
+          <table className="w-full min-w-[980px]">
+            <thead><tr><th className="th">Date</th><th className="th text-right">Net sales</th><th className="th text-right">Returns</th><th className="th text-right">Credit</th><th className="th text-right">Cheques</th><th className="th text-right">Discount</th>
               <th className="th text-right">Old credit (cash / chq)</th><th className="th text-right">Expenses</th><th className="th text-right">Expected cash</th><th className="th text-right">Counted</th><th className="th text-right">+/−</th></tr></thead>
             <tbody className="divide-y divide-neutral-100">
               {rows.map((r) => (
                 <tr key={r.date}>
                   <td className="td text-neutral-500">{r.date}</td><td className="td text-right">{money(r.net)}</td><td className="td text-right text-neutral-500">{money(r.returns)}</td>
-                  <td className="td text-right">{r.recorded ? money(r.credit) : "—"}</td><td className="td text-right">{r.recorded ? money(r.cheques) : "—"}</td>
+                  <td className="td text-right">{r.recorded ? money(r.credit) : "—"}</td><td className="td text-right">{r.recorded ? money(r.cheques) : "—"}</td><td className="td text-right">{r.recorded ? money(r.discount) : "—"}</td>
                   <td className="td text-right text-neutral-500">{r.recorded ? `${money(r.oldCash)} / ${money(r.oldCheque)}` : "—"}</td>
                   <td className="td text-right">{r.recorded ? money(r.expenses) : "—"}</td><td className="td text-right">{r.recorded ? money(r.expected) : "—"}</td>
                   <td className="td text-right">{r.hasCash ? money(r.counted) : "—"}</td><td className={cn("td text-right font-medium", r.hasCash && tone(r.difference))}>{r.hasCash ? money(r.difference) : "—"}</td>
                 </tr>
               ))}
               <tr className="bg-neutral-50 font-semibold">
-                <td className="td">Total</td><td className="td text-right">{money(tot("net"))}</td><td className="td text-right">{money(tot("returns"))}</td><td className="td text-right">{money(tot("credit"))}</td><td className="td text-right">{money(tot("cheques"))}</td>
+                <td className="td">Total</td><td className="td text-right">{money(tot("net"))}</td><td className="td text-right">{money(tot("returns"))}</td><td className="td text-right">{money(tot("credit"))}</td><td className="td text-right">{money(tot("cheques"))}</td><td className="td text-right">{money(tot("discount"))}</td>
                 <td className="td text-right">{money(tot("oldCash"))} / {money(tot("oldCheque"))}</td><td className="td text-right">{money(tot("expenses"))}</td><td className="td text-right">{money(tot("expected"))}</td>
                 <td className="td text-right">{money(tot("counted"))}</td><td className={cn("td text-right", tone(tot("difference")))}>{money(tot("difference"))}</td>
               </tr>

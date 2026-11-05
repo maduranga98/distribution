@@ -5,18 +5,18 @@ const bump = (m, k, init) => (m[k] ||= init());
 
 /**
  * Business analytics over unloaded runs in [from, to].
- * Pie logic: gross sale = cash + cheques + credit + market returns.
+ * Pie logic: gross sale = cash + cheques + credit + discounts + market returns.
  * Runs saved before cash tracking existed count as "unrecorded" rather than being guessed.
  */
 export function analyze({ runs }, from, to) {
   const rs = runs.filter((r) => isDone(r) && inRange(r.date, from, to));
   const items = {}, routes = {}, days = {}, returns = [], trips = [];
-  let cash = 0, cheques = 0, credit = 0, unrecorded = 0, oldCash = 0, oldCheque = 0, expenses = 0, distance = 0, difference = 0, counted = 0;
+  let cash = 0, cheques = 0, credit = 0, discount = 0, unrecorded = 0, oldCash = 0, oldCheque = 0, expenses = 0, distance = 0, difference = 0, counted = 0;
 
   for (const r of rs) {
     const c = r.collection, t = r.totals || {};
     if (c) {
-      cash += Math.max(c.cashSales, 0); cheques += c.cheques; credit += c.credit;
+      cash += Math.max(c.cashSales, 0); cheques += c.cheques; credit += c.credit; discount += c.discount || 0;
       oldCash += c.oldCash; oldCheque += c.oldCheque; expenses += c.expenses;
       if (c.difference != null) { difference += c.difference; counted++; }
     } else unrecorded += t.sales || 0;
@@ -53,6 +53,7 @@ export function analyze({ runs }, from, to) {
       { key: "cash", label: "Cash", value: cash, color: "#171717" },
       { key: "cheques", label: "Cheques", value: cheques, color: "#2563eb" },
       { key: "credit", label: "Credit", value: credit, color: "#f59e0b" },
+      { key: "discount", label: "Discounts", value: discount, color: "#8b5cf6" },
       { key: "returns", label: "Market returns", value: marketValue, color: "#ef4444" },
       { key: "unrecorded", label: "Not recorded", value: unrecorded, color: "#d4d4d4" },
     ].filter((p) => p.value > 0),

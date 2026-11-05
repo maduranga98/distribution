@@ -30,7 +30,7 @@ export default function UnloadForm({ run, onClose }) {
   const [meterEnd, setMeterEnd] = useState(run.meterEnd ?? "");
   const [exp, setExp] = useState(() => (run.dayExpenses?.length ? run.dayExpenses.map((e) => ({ ...e, amount: String(e.amount) })) : []));
   const [cash, setCash] = useState({
-    credit: str(c.credit), cheques: str(c.cheques), oldCash: str(c.oldCash), oldCheque: str(c.oldCheque),
+    credit: str(c.credit), discount: str(c.discount), cheques: str(c.cheques), oldCash: str(c.oldCash), oldCheque: str(c.oldCheque),
     cashCounted: c.counted == null ? "" : String(c.counted),
   });
   const [error, setError] = useState("");
@@ -128,6 +128,7 @@ export default function UnloadForm({ run, onClose }) {
           <div className="grid grid-cols-2 gap-3">
             <Field label="Credit given today"><input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.credit} onChange={setC("credit")} /></Field>
             <Field label="Cheques received (today's sales)"><input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.cheques} onChange={setC("cheques")} /></Field>
+            <Field label="Discounts given today"><input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.discount} onChange={setC("discount")} /></Field>
             <Field label="Old credit collected · cash"><input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.oldCash} onChange={setC("oldCash")} /></Field>
             <Field label="Old credit collected · cheque"><input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.oldCheque} onChange={setC("oldCheque")} /></Field>
           </div>
@@ -138,11 +139,12 @@ export default function UnloadForm({ run, onClose }) {
             <Line label="Net sales" value={money(calc.sales)} />
             <Line label="Less credit given" value={`−${money(money$.credit)}`} />
             <Line label="Less cheques received" value={`−${money(money$.cheques)}`} />
+            <Line label="Less discounts given" value={`−${money(money$.discount)}`} />
             <Line label="Add old credit collected (cash)" value={`+${money(money$.oldCash)}`} />
             <Line label="Less expenses" value={`−${money(expTotal)}`} />
             <Line strong label="Expected cash" value={money(money$.expected)} />
           </div>
-          <Field label="Total cash in hand (counted)">
+          <Field label="Cash on hand (counted)">
             <input className="input" type="number" inputMode="decimal" min="0" step="any" value={cash.cashCounted} onChange={setC("cashCounted")} />
           </Field>
           <div className="rounded-lg bg-neutral-50 p-3">
