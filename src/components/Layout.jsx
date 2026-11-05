@@ -9,11 +9,11 @@ import logo from "../assets/logo.png";
 const NAV = [
   { to: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard },
   { to: "/daily", label: "Daily", icon: Truck },
-  { to: "/routes", label: "Routes", icon: Route },
-  { to: "/analytics", label: "Analytics", short: "Stats", icon: PieChart },
   { to: "/stock", label: "Inventory", short: "Stock", icon: Boxes },
-  { to: "/expenses", label: "Expenses", short: "Spend", icon: Receipt },
   { to: "/accounting", label: "Accounts", short: "Books", icon: Wallet },
+  { to: "/expenses", label: "Expenses", short: "Spend", icon: Receipt },
+  { to: "/analytics", label: "Analytics", short: "Stats", icon: PieChart },
+  { to: "/routes", label: "Routes", icon: Route },
 ];
 
 export default function Layout() {
