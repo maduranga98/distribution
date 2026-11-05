@@ -12,6 +12,7 @@ import Stock from "./pages/Stock";
 import Expenses from "./pages/Expenses";
 import Accounting from "./pages/Accounting";
 import Daily from "./pages/Daily";
+import Analytics from "./pages/Analytics";
 
 function Shell() {
   const { current, loading } = useBusiness();
@@ -25,6 +26,7 @@ function Shell() {
           <Route path="daily" element={<Daily />} />
           <Route path="routes" element={<Navigate to="/daily" />} />
           <Route path="stock" element={<Stock />} />
+          <Route path="analytics" element={<Analytics />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="accounting" element={<Accounting />} />
           <Route path="*" element={<Navigate to="/" />} />

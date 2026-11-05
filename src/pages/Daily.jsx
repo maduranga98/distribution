@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { Boxes, ChevronDown, MapPin, PackageCheck, PackageMinus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useData } from "../context/DataContext";
-import { add, cancelLoading, remove, saveLoading, saveUnloading, update } from "../lib/db";
-import { calcRun } from "../lib/runs";
+import { add, cancelLoading, remove, saveLoading, update } from "../lib/db";
 import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
 import { Badge, Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
 import StockTable from "../components/StockTable";
 import QtyInput from "../components/QtyInput";
+import UnloadForm from "../components/UnloadForm";
 
 function RouteForm({ route, onClose }) {
   const { uid } = useData();
@@ -65,8 +65,10 @@ function LoadForm({ date, run, onClose }) {
   const old = useMemo(() => Object.fromEntries((run?.items || []).map((i) => [i.productId, i])), [run]);
   const [qty, setQty] = useState(() => Object.fromEntries((run?.items || []).map((i) => [i.productId, String(i.loaded)])));
   const [q, setQ] = useState("");
+  const [meter, setMeter] = useState(run?.meterStart ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const lastMeter = runs.find((r) => r.routeId === routeId && r.meterEnd != null)?.meterEnd; // where this vehicle stopped last time
   const route = routes.find((r) => r.id === routeId);
   const visit = run && routeId === run.routeId && d === run.date ? run.visit
     : runs.filter((r) => r.routeId === routeId && r.date === d && r.id !== run?.id).length + 1;
@@ -84,7 +86,7 @@ function LoadForm({ date, run, onClose }) {
     setBusy(true); setError("");
     try {
       await saveLoading(uid, {
-        date: d, routeId, routeName: route.name, visit,
+        date: d, routeId, routeName: route.name, visit, meterStart: meter === "" ? null : num(meter),
         items: picked.map((p) => ({ productId: p.id, name: p.name, unit: p.unit, caseSize: p.caseSize || 0, loaded: num(qty[p.id]), price: priceOf(p), cost: old[p.id]?.cost ?? p.cost })),
       }, run?.id);
       onClose();
@@ -103,6 +105,12 @@ function LoadForm({ date, run, onClose }) {
             </select>
           </Field>
         </div>
+        <Field label="Vehicle meter (opening)">
+          <div className="flex items-center gap-2">
+            <input className="input" type="number" inputMode="decimal" min="0" step="any" placeholder="Meter reading" value={meter} onChange={(e) => setMeter(e.target.value)} />
+            {lastMeter != null && meter === "" && <button type="button" className="btn-ghost shrink-0" onClick={() => setMeter(String(lastMeter))}>Last: {lastMeter}</button>}
+          </div>
+        </Field>
         <input className="input" placeholder="Search items…" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="max-h-[45vh] divide-y divide-neutral-100 overflow-y-auto rounded-lg border border-neutral-200">
           {list.map((p) => (
@@ -124,64 +132,6 @@ function LoadForm({ date, run, onClose }) {
   );
 }
 
-/** Evening unloading: leftover qty + optional market returns. Also edits a saved unloading. */
-function UnloadForm({ run, onClose }) {
-  const { uid } = useData();
-  const [v, setV] = useState(() => Object.fromEntries(run.items.map((i) => [i.productId, { returned: i.returned ? String(i.returned) : "", marketReturn: i.marketReturn ? String(i.marketReturn) : "" }])));
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const calc = calcRun(run.items.map((i) => ({ ...i, ...v[i.productId] })));
-  const set = (id, k, val) => setV({ ...v, [id]: { ...v[id], [k]: val } });
-
-  const save = async (e) => {
-    e.preventDefault();
-    if (calc.error) return setError(calc.error);
-    setBusy(true); setError("");
-    try {
-      await saveUnloading(uid, run.id, Object.fromEntries(Object.entries(v).map(([id, x]) => [id, { returned: num(x.returned), marketReturn: num(x.marketReturn) }])));
-      onClose();
-    } catch (err) { setError(err.message); setBusy(false); }
-  };
-
-  return (
-    <Modal title={`${run.status === "loaded" ? "Unload" : "Edit unloading"} · ${run.routeName}`} onClose={onClose} wide>
-      <form onSubmit={save} className="space-y-4">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px]">
-            <thead><tr>
-              <th className="th !px-2">Item</th><th className="th !px-2 text-right">Price / pc</th><th className="th !px-2 text-right">Loaded</th>
-              <th className="th !px-1 text-right">Unloaded</th><th className="th !px-2 text-right">Sold</th>
-              <th className="th !px-1 text-right">Market return</th><th className="th !px-2 text-right">Net</th>
-            </tr></thead>
-            <tbody className="divide-y divide-neutral-100">
-              {calc.rows.map((r) => (
-                <tr key={r.productId}>
-                  <td className="td !px-2 !py-1.5">{r.name}</td>
-                  <td className="td !px-2 !py-1.5 text-right text-neutral-500">{money(r.price)}</td>
-                  <td className="td !px-2 !py-1.5 text-right text-neutral-500">{fmtQty(r.loaded, r.caseSize, r.unit)}</td>
-                  <td className="!px-1 !py-1.5"><QtyInput caseSize={r.caseSize} value={v[r.productId].returned} onChange={(x) => set(r.productId, "returned", x)} /></td>
-                  <td className={cn("td !px-2 !py-1.5 text-right font-medium", r.error && "text-red-600")}>{fmtQty(r.sold, r.caseSize, r.unit)}</td>
-                  <td className="!px-1 !py-1.5"><QtyInput caseSize={r.caseSize} value={v[r.productId].marketReturn} onChange={(x) => set(r.productId, "marketReturn", x)} /></td>
-                  <td className="td !px-2 !py-1.5 text-right">{money(r.sales)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-xs text-neutral-400">Sold = Loaded − Unloaded (unloaded goes back to the warehouse). Market return = goods taken back from shops; valued at the retail price and deducted from sales (not restocked).</p>
-
-        <div className="grid grid-cols-3 gap-2 rounded-lg bg-neutral-50 p-3 text-center text-sm">
-          <div><p className="text-xs text-neutral-500">Sale value</p><p className="font-medium">{money(calc.gross)}</p></div>
-          <div><p className="text-xs text-neutral-500">Market returns</p><p className="font-medium">−{money(calc.marketValue)}</p></div>
-          <div><p className="text-xs text-neutral-500">Net sale</p><p className="font-semibold">{money(calc.sales)}</p></div>
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="btn-primary w-full" disabled={busy || !!calc.error}>{run.status === "loaded" ? "Save unloading" : "Save changes"}</button>
-      </form>
-    </Modal>
-  );
-}
-
 function RunCard({ run, onEdit, onUnload }) {
   const { uid } = useData();
   const [open, setOpen] = useState(false);
@@ -198,7 +148,15 @@ function RunCard({ run, onEdit, onUnload }) {
           <p className="mt-0.5 text-xs text-neutral-500">
             {run.items.length} items · {sum(run.items, (i) => i.loaded)} pcs loaded
             {done && ` · sold ${run.totals.sold} pcs · market returns ${money(run.totals.marketValue)} · net sale ${money(run.totals.sales)}`}
+            {run.meterStart != null && ` · meter ${run.meterStart}${run.meterEnd != null ? ` → ${run.meterEnd}${run.distance != null ? ` (${+run.distance.toFixed(1)} km)` : ""}` : ""}`}
           </p>
+          {done && run.collection && (
+            <p className="mt-0.5 text-xs text-neutral-500">
+              Expenses {money(run.collection.expenses)} · credit {money(run.collection.credit)} · cheques {money(run.collection.cheques)}
+              {run.collection.difference != null && <> · <span className={run.collection.difference < 0 ? "text-red-600" : "text-emerald-600"}>
+                {run.collection.difference < 0 ? "short" : "excess"} {money(Math.abs(run.collection.difference))}</span></>}
+            </p>
+          )}
         </button>
         <button className="btn-ghost" onClick={onEdit}><Pencil size={15} />{done ? "Edit unloading" : "Edit loading"}</button>
         {!done && <>

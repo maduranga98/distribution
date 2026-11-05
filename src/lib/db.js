@@ -3,7 +3,8 @@ import {
   serverTimestamp, updateDoc, writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { calcRun } from "./runs";
+import { calcCash, calcDistance, calcRun } from "./runs";
+import { num } from "./utils";
 
 const col = (base, name) => collection(db, `users/${base}/${name}`);
 const ref = (base, name, id) => doc(db, `users/${base}/${name}/${id}`);
@@ -100,8 +101,11 @@ export async function cancelLoading(base, run) {
 /**
  * Evening unloading (also used to edit one). lines[productId] = { returned, marketReturn }.
  * Leftover goes back to the warehouse; sold = loaded − returned; market returns reduce the sale value.
+ * extra = { meterEnd, expenses: [{category, amount, note}], collection: {credit, cheques, oldCash, oldCheque, cashCounted} }.
+ * The day's expenses are also written to the expenses collection (linked by runId) so Accounts stay correct;
+ * on edit the previously written ones are replaced.
  */
-export async function saveUnloading(base, runId, lines) {
+export async function saveUnloading(base, runId, lines, extra = {}) {
   const runRef = ref(base, "runs", runId);
   await runTransaction(db, async (tx) => {
     const s = await tx.get(runRef);
@@ -110,15 +114,35 @@ export async function saveUnloading(base, runId, lines) {
     const items = run.items.map((i) => ({ ...i, ...lines[i.productId] }));
     const calc = calcRun(items);
     if (calc.error) throw new Error(calc.error);
+
+    const meterEnd = extra.meterEnd === "" || extra.meterEnd == null ? null : num(extra.meterEnd);
+    const distance = calcDistance(run.meterStart, meterEnd);
+    if (distance != null && distance < 0) throw new Error("Closing meter is lower than the opening meter");
+
+    const dayExpenses = (extra.expenses || [])
+      .map((e) => ({ category: e.category, amount: num(e.amount), note: (e.note || "").trim() }))
+      .filter((e) => e.amount > 0);
+    const expenseTotal = dayExpenses.reduce((t, e) => t + e.amount, 0);
+    const cash = calcCash(calc.sales, extra.collection || {}, expenseTotal);
+
     const wasDone = run.status !== "loaded";
     run.items.forEach((i) => {
       const delta = Number(lines[i.productId]?.returned || 0) - (wasDone ? Number(i.returned || 0) : 0);
       if (delta) tx.update(ref(base, "products", i.productId), { stock: increment(delta) });
     });
+
+    (run.expenseIds || []).forEach((id) => tx.delete(ref(base, "expenses", id)));
+    const expenseIds = dayExpenses.map((e) => {
+      const r = doc(col(base, "expenses"));
+      tx.set(r, stamp({ ...e, date: run.date, runId, routeName: run.routeName }));
+      return r.id;
+    });
+
     tx.update(runRef, {
       status: "unloaded",
       items: calc.rows.map(({ error, ...r }) => r),
       totals: { loaded: calc.loaded, sold: calc.sold, gross: calc.gross, marketValue: calc.marketValue, sales: calc.sales, cost: calc.cost },
+      meterEnd, distance, dayExpenses, expenseIds, collection: cash,
       unloadedAt: serverTimestamp(),
     });
   });
