@@ -3,8 +3,8 @@ import { num } from "./utils";
 /**
  * Per-item maths for one loading/unloading.
  *   sold   = loaded − unloaded (what came back on the vehicle)
- *   gross  = sold × selling price
- *   net    = gross − (market returns × selling price)
+ *   gross  = sold × retail price
+ *   net    = gross − (market returns × retail price)
  */
 export function calcLine(l) {
   const loaded = num(l.loaded), returned = num(l.returned), mr = num(l.marketReturn);

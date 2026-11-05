@@ -2,7 +2,7 @@
 
 React + Vite + Tailwind + Firebase (Auth, Firestore, Hosting).
 
-**Flow:** Inventory → GRN (receive stock, optional new selling price per item) → Loading (pick date + route, save, edit
+**Flow:** Inventory → GRN (receive stock, optional new retail price per item) → Loading (pick date + route, save, edit
 until unloaded) → Unloading in the evening (unloaded qty + optional market returns, editable) → Daily sales.
 Sold qty = loaded − unloaded; net sale = sold × price − market returns × price. Current stock shows warehouse, on-vehicle and total.
 

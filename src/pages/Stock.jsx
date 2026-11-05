@@ -26,11 +26,11 @@ function ProductForm({ product, onClose }) {
         <Field label="SKU"><input className="input" value={f.sku} onChange={set("sku")} /></Field>
         <Field label="Unit"><input className="input" value={f.unit} onChange={set("unit")} /></Field>
         <div className="col-span-2"><Field label="Pieces per case (blank if not sold in cases)"><input className="input" type="number" step="1" min="0" placeholder="e.g. 48" value={f.caseSize || ""} onChange={set("caseSize")} /></Field></div>
-        <Field label="Cost price (per piece)"><input className="input" type="number" step="any" min="0" required value={f.cost} onChange={set("cost")} /></Field>
-        {!product && <Field label="Selling price (per piece)"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>}
+        <Field label="MRP (per piece)"><input className="input" type="number" step="any" min="0" required value={f.cost} onChange={set("cost")} /></Field>
+        {!product && <Field label="Retail price (per piece)"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>}
         {!product && <Field label="Opening stock"><QtyInput caseSize={f.caseSize} value={String(f.stock)} onChange={(v) => setF({ ...f, stock: v })} /></Field>}
         <Field label="Low-stock alert at"><input className="input" type="number" step="any" min="0" value={f.minStock} onChange={set("minStock")} /></Field>
-        {product && <p className="col-span-2 text-xs text-neutral-400">Selling price is changed when receiving stock (GRN).</p>}
+        {product && <p className="col-span-2 text-xs text-neutral-400">Retail price is changed when receiving stock (GRN).</p>}
         <button className="btn-primary col-span-2 mt-2">Save</button>
       </form>
     </Modal>
@@ -138,8 +138,8 @@ function GrnForm({ onClose }) {
                 <button type="button" className="col-span-1 justify-self-end rounded p-1.5 text-neutral-400 hover:bg-neutral-100 sm:order-last"
                   onClick={() => setLines(lines.length > 1 ? lines.filter((_, k) => k !== i) : [blank()])}><X size={16} /></button>
                 <div className="col-span-6 sm:col-span-3"><QtyInput caseSize={p?.caseSize} value={l.qty} onChange={(v) => setLine(i, { qty: v })} /></div>
-                <input className="input col-span-6 sm:col-span-2" type="number" step="any" min="0" placeholder="Cost / pc" value={l.cost} onChange={(e) => setLine(i, { cost: e.target.value })} />
-                <div className="col-span-12 sm:col-span-12"><span className="label">Selling price</span><PriceSelect product={p} line={l} onChange={(patch) => setLine(i, patch)} /></div>
+                <input className="input col-span-6 sm:col-span-2" type="number" step="any" min="0" placeholder="MRP / pc" value={l.cost} onChange={(e) => setLine(i, { cost: e.target.value })} />
+                <div className="col-span-12 sm:col-span-12"><span className="label">Retail price</span><PriceSelect product={p} line={l} onChange={(patch) => setLine(i, patch)} /></div>
               </div>
             );
           })}
@@ -178,7 +178,7 @@ function GrnList() {
           </div>
           {open === g.id && (
             <table className="mb-2 w-full">
-              <thead><tr><th className="th">Item</th><th className="th text-right">Qty</th><th className="th text-right">Cost / pc</th><th className="th text-right">Selling price / pc</th></tr></thead>
+              <thead><tr><th className="th">Item</th><th className="th text-right">Qty</th><th className="th text-right">MRP / pc</th><th className="th text-right">Retail price / pc</th></tr></thead>
               <tbody>{g.items.map((i) => (
                 <tr key={i.productId}>
                   <td className="td !py-1.5">{i.name}</td><td className="td !py-1.5 text-right">{fmtQty(i.qty, i.caseSize, i.unit)}</td><td className="td !py-1.5 text-right">{money(i.cost)}</td>
@@ -210,7 +210,7 @@ export default function Stock() {
       <div className="mb-4 grid grid-cols-3 gap-3">
         <Stat label="Products" value={products.length} />
         <Stat label="On vehicles" value={van} hint="pcs, not yet unloaded" />
-        <Stat label="Stock value (cost)" value={money(stockValue(products))} />
+        <Stat label="Stock value (MRP)" value={money(stockValue(products))} />
       </div>
 
       <div className="mb-3 flex items-center justify-between gap-3">

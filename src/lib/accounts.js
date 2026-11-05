@@ -1,8 +1,8 @@
-import { inRange, sum } from "./utils";
+import { DEFAULT_MARGIN, inRange, sum } from "./utils";
 import { isDone } from "./runs";
 
 /** Profit & loss from unloaded runs (net of market returns), GRN purchases and expenses. */
-export function summarize({ runs, expenses, grns }, from, to) {
+export function summarize({ runs, expenses, grns, margin = DEFAULT_MARGIN }, from, to) {
   const r = runs.filter((x) => isDone(x) && inRange(x.date, from, to));
   const e = expenses.filter((x) => inRange(x.date, from, to));
   const g = grns.filter((x) => inRange(x.date, from, to));
@@ -10,7 +10,7 @@ export function summarize({ runs, expenses, grns }, from, to) {
   const gross = sum(r, (x) => x.totals?.gross ?? 0);
   const marketReturns = sum(r, (x) => x.totals?.marketValue ?? 0);
   const revenue = sum(r, (x) => x.totals?.sales ?? 0);
-  const cogs = sum(r, (x) => x.totals?.cost ?? 0);
+  const cogs = sum(r, (x) => x.totals?.cost ?? 0) * (1 - margin / 100); // buying cost = MRP less profit margin
   const expenseTotal = sum(e, (x) => x.amount);
   return {
     gross, marketReturns, revenue, cogs, grossProfit: revenue - cogs, expenses: expenseTotal,
