@@ -8,12 +8,12 @@ import logo from "../assets/logo.png";
 
 const NAV = [
   { to: "/", label: "Dashboard", short: "Home", icon: LayoutDashboard },
+  { to: "/stock", label: "Inventory", short: "Stock", icon: Boxes },
   { to: "/daily", label: "Daily", icon: Truck },
   { to: "/routes", label: "Routes", icon: Route },
-  { to: "/analytics", label: "Analytics", short: "Stats", icon: PieChart },
-  { to: "/stock", label: "Inventory", short: "Stock", icon: Boxes },
   { to: "/expenses", label: "Expenses", short: "Spend", icon: Receipt },
   { to: "/accounting", label: "Accounts", short: "Books", icon: Wallet },
+  { to: "/analytics", label: "Analytics", short: "Stats", icon: PieChart },
 ];
 
 export default function Layout() {
