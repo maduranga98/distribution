@@ -11,7 +11,8 @@ import QtyInput from "../components/QtyInput";
 
 function ProductForm({ product, onClose }) {
   const { uid, products } = useData();
-  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", caseSize: "", cost: "", price: "", minStock: "", stock: "", freeEvery: "", ...product });
+  const [f, setF] = useState({ name: "", sku: "", unit: "pcs", category: "", caseSize: "", cost: "", price: "", minStock: "", stock: "", freeEvery: "", ...product });
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))].sort();
   const [error, setError] = useState("");
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const orders = products.map((p) => p.order).filter(Number.isFinite);
@@ -19,7 +20,7 @@ function ProductForm({ product, onClose }) {
   const save = async (e) => {
     e.preventDefault();
     const data = {
-      name: f.name.trim(), sku: f.sku.trim(), unit: f.unit.trim() || "pcs", caseSize: num(f.caseSize) > 1 ? num(f.caseSize) : 0,
+      name: f.name.trim(), sku: f.sku.trim(), category: f.category.trim(), unit: f.unit.trim() || "pcs", caseSize: num(f.caseSize) > 1 ? num(f.caseSize) : 0,
       cost: num(f.cost), minStock: num(f.minStock), freeEvery: num(f.freeEvery) > 0 ? num(f.freeEvery) : 0,
     };
     try {
@@ -34,6 +35,12 @@ function ProductForm({ product, onClose }) {
         <div className="col-span-2"><Field label="Name"><input className="input" required autoFocus value={f.name} onChange={set("name")} /></Field></div>
         <Field label="SKU"><input className="input" value={f.sku} onChange={set("sku")} /></Field>
         <Field label="Unit"><input className="input" value={f.unit} onChange={set("unit")} /></Field>
+        <div className="col-span-2">
+          <Field label="Category (e.g. Biscuits, Beverages)">
+            <input className="input" list="product-categories" value={f.category} onChange={set("category")} placeholder="Pick or type a new one" />
+            <datalist id="product-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
+          </Field>
+        </div>
         <div className="col-span-2"><Field label="Pieces per case (blank if not sold in cases)"><input className="input" type="number" step="1" min="0" placeholder="e.g. 48" value={f.caseSize || ""} onChange={set("caseSize")} /></Field></div>
         <Field label="MRP (per piece)"><input className="input" type="number" step="any" min="0" required value={f.cost} onChange={set("cost")} /></Field>
         <Field label="List / retail price (per piece)"><input className="input" type="number" step="any" min="0" required value={f.price} onChange={set("price")} /></Field>

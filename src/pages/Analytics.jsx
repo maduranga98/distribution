@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { BarChart3 } from "lucide-react";
 import { useData } from "../context/DataContext";
-import { analyze } from "../lib/analytics";
+import { analyze, inventoryValue } from "../lib/analytics";
 import { cn, fmtQty, monthStart, money, today } from "../lib/utils";
 import { Bar, Donut } from "../components/charts";
 import { Badge, Empty, PageHeader, Stat } from "../components/ui";
 import { CashLog, MonthSummary, YearTracker } from "./Reports";
 
-const TABS = [["overview", "Overview"], ["items", "Items"], ["returns", "Market returns"], ["routes", "Routes & trips"], ["cash", "Cash log"], ["month", "Month summary"], ["year", "Year tracker"]];
+const TABS = [["overview", "Overview"], ["items", "Items"], ["inventory", "Inventory value"], ["returns", "Market returns"], ["routes", "Routes & trips"], ["cash", "Cash log"], ["month", "Month summary"], ["year", "Year tracker"]];
 const SORTS = { net: "Net sales", sold: "Pieces sold", sellThrough: "Sell-through", returnRate: "Return rate" };
 const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 const km = (n) => (n == null ? "—" : `${+n.toFixed(1)} km`);
@@ -106,6 +106,61 @@ function Items({ a }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function Inventory() {
+  const d = useData();
+  const [cat, setCat] = useState("");
+  const inv = useMemo(() => inventoryValue(d, cat), [d.products, d.runs, cat]);
+  const top = inv.items[0];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Stat label="Total stock value (MRP)" value={money(inv.total)} hint={`${d.products.length} items · ${inv.categories.length} categories`} />
+        <Stat label={cat ? `${cat} value` : "Most valuable category"} value={money(cat ? inv.scopeValue : inv.categories[0]?.value)} hint={cat ? `${pct(inv.total ? (inv.scopeValue / inv.total) * 100 : 0)} of total stock` : inv.categories[0]?.label} />
+        <Stat className="col-span-2 sm:col-span-1" label="Most valuable item" value={top ? money(top.value) : "—"} hint={top ? `${top.name} · ${pct(top.shareTotal)} of total` : undefined} />
+      </div>
+
+      <div className="card p-4">
+        <p className="mb-1 text-sm font-medium">Stock value by category</p>
+        <p className="mb-4 text-xs text-neutral-400">Warehouse + vehicle stock at MRP. Use the filter below to drill into a category.</p>
+        {inv.categories.length ? <Donut data={inv.categories} center={<><span className="text-[11px] text-neutral-400">Total</span><span className="text-sm font-semibold">{money(inv.total)}</span></>} />
+          : <Empty>No products</Empty>}
+      </div>
+
+      <div className="card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 p-3">
+          <p className="text-sm font-medium">Items by stock value</p>
+          <select className="input !w-52" value={cat} onChange={(e) => setCat(e.target.value)}>
+            <option value="">All categories</option>
+            {inv.categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+        </div>
+        {inv.items.length === 0 ? <Empty>No items</Empty> : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead><tr>
+                <th className="th">Item</th><th className="th text-right">In stock</th><th className="th text-right">Value</th>
+                {cat && <th className="th text-right">% of {cat}</th>}<th className="th text-right">% of total stock</th><th className="th w-28">Share</th>
+              </tr></thead>
+              <tbody className="divide-y divide-neutral-100">
+                {inv.items.map((i) => (
+                  <tr key={i.id}>
+                    <td className="td"><div className="font-medium">{i.name}</div>{!cat && <div className="text-xs text-neutral-400">{i.category}</div>}</td>
+                    <td className="td text-right text-neutral-500">{fmtQty(i.qty, i.caseSize, i.unit)}</td>
+                    <td className="td text-right font-medium">{money(i.value)}</td>
+                    {cat && <td className="td text-right">{pct(i.shareScope)}</td>}
+                    <td className="td text-right text-neutral-500">{pct(i.shareTotal)}</td>
+                    <td className="td"><Bar pct={i.shareTotal} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -210,7 +265,7 @@ export default function Analytics() {
   const [tab, setTab] = useState("overview");
   const a = useMemo(() => analyze(d, from, to), [d.runs, from, to]);
   const View = { overview: Overview, items: Items, returns: Returns, routes: Routes }[tab];
-  const own = ["cash", "month", "year"].includes(tab); // these tabs pick their own month / year
+  const own = ["inventory", "cash", "month", "year"].includes(tab); // these tabs pick their own month / year
 
   return (
     <>
@@ -228,7 +283,7 @@ export default function Analytics() {
           <button key={k} onClick={() => setTab(k)} className={cn("flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition", tab === k ? "bg-white shadow-sm" : "text-neutral-500 hover:text-brand")}>{l}</button>
         ))}
       </div>
-      {tab === "cash" ? <CashLog /> : tab === "month" ? <MonthSummary /> : tab === "year" ? <YearTracker /> : <View a={a} />}
+      {tab === "inventory" ? <Inventory /> : tab === "cash" ? <CashLog /> : tab === "month" ? <MonthSummary /> : tab === "year" ? <YearTracker /> : <View a={a} />}
     </>
   );
 }

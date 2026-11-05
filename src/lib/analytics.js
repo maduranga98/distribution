@@ -1,7 +1,34 @@
 import { inRange, sum } from "./utils";
 import { isDone } from "./runs";
+import { onVehicle } from "./accounts";
 
 const bump = (m, k, init) => (m[k] ||= init());
+
+export const UNCATEGORISED = "Uncategorised";
+const PALETTE = ["#001948", "#2563eb", "#fd6b01", "#8b5cf6", "#10b981", "#ef4444", "#f59e0b", "#06b6d4", "#ec4899", "#84cc16"];
+
+/**
+ * Inventory value (at MRP) per item and per category. Stock on vehicles still counts as inventory.
+ * `category` filters the item list; shares are given against the whole stock and against the category.
+ */
+export function inventoryValue({ products, runs }, category = "") {
+  const van = onVehicle(runs);
+  const all = products.map((p) => {
+    const qty = (p.stock || 0) + (van[p.id] || 0);
+    return { id: p.id, name: p.name, sku: p.sku, caseSize: p.caseSize, unit: p.unit, category: p.category || UNCATEGORISED, qty, cost: p.cost || 0, value: qty * (p.cost || 0) };
+  });
+  const total = sum(all, (i) => i.value);
+  const cats = {};
+  for (const i of all) {
+    const c = bump(cats, i.category, () => ({ key: i.category, label: i.category, value: 0, items: 0 }));
+    c.value += i.value; c.items++;
+  }
+  const categories = Object.values(cats).sort((a, b) => b.value - a.value).map((c, k) => ({ ...c, color: PALETTE[k % PALETTE.length], share: total > 0 ? (c.value / total) * 100 : 0 }));
+  const scope = category ? all.filter((i) => i.category === category) : all;
+  const scopeValue = sum(scope, (i) => i.value);
+  const items = scope.map((i) => ({ ...i, shareTotal: total > 0 ? (i.value / total) * 100 : 0, shareScope: scopeValue > 0 ? (i.value / scopeValue) * 100 : 0 })).sort((a, b) => b.value - a.value);
+  return { total, scopeValue, categories, items };
+}
 
 /**
  * Business analytics over unloaded runs in [from, to].
