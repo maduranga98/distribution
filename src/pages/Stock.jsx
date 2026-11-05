@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ClipboardList, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ClipboardList, ListOrdered, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { LedgerView, DayReportView, PriceLogView } from "../components/StockViews";
 import { useData } from "../context/DataContext";
-import { adjustStock, createGrn, createProduct, deleteGrn, deleteProduct, saveProduct } from "../lib/db";
+import { adjustStock, createGrn, createProduct, deleteGrn, deleteProduct, saveProduct, saveProductOrder } from "../lib/db";
 import { onVehicle, stockValue } from "../lib/accounts";
 import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
 import { Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
@@ -14,6 +14,8 @@ function ProductForm({ product, onClose }) {
   const [f, setF] = useState({ name: "", sku: "", unit: "pcs", caseSize: "", cost: "", price: "", minStock: "", stock: "", freeEvery: "", ...product });
   const [error, setError] = useState("");
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const orders = products.map((p) => p.order).filter(Number.isFinite);
+  const nextOrder = orders.length ? Math.max(...orders) + 1 : null; // new items join the end of a manual order
   const save = async (e) => {
     e.preventDefault();
     const data = {
@@ -22,7 +24,7 @@ function ProductForm({ product, onClose }) {
     };
     try {
       if (product) await saveProduct(uid, product, data, num(f.price));
-      else await createProduct(uid, { ...data, price: num(f.price), priceHistory: [], stock: num(f.stock) });
+      else await createProduct(uid, { ...data, price: num(f.price), priceHistory: [], stock: num(f.stock), ...(nextOrder != null && { order: nextOrder }) });
       onClose();
     } catch (err) { setError(err.message); }
   };
@@ -221,11 +223,57 @@ function GrnList() {
   );
 }
 
+/** Arrange items to match the manual sheet: move up/down, or type the position to jump there. */
+function ReorderList({ onDone }) {
+  const { uid, products } = useData();
+  const [ids, setIds] = useState(() => products.map((p) => p.id));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const byId = Object.fromEntries(products.map((p) => [p.id, p]));
+  const move = (from, to) => {
+    const t = Math.max(0, Math.min(ids.length - 1, to));
+    if (t === from) return;
+    const next = [...ids];
+    next.splice(t, 0, next.splice(from, 1)[0]);
+    setIds(next);
+  };
+  const save = async () => {
+    setBusy(true); setError("");
+    try { await saveProductOrder(uid, ids); onDone(); } catch (e) { setError(e.message); setBusy(false); }
+  };
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-3 py-2.5">
+        <p className="text-xs text-neutral-500">Use the arrows, or type a position. This order is used for loading and unloading.</p>
+        <div className="flex shrink-0 gap-2">
+          <button className="btn-ghost" onClick={onDone} disabled={busy}>Cancel</button>
+          <button className="btn-primary" onClick={save} disabled={busy}>Save order</button>
+        </div>
+      </div>
+      {error && <p className="px-3 pt-2 text-sm text-red-600">{error}</p>}
+      <ul className="divide-y divide-neutral-100">
+        {ids.map((id, i) => (
+          <li key={id} className="flex items-center gap-2 px-3 py-1.5">
+            <input
+              key={`${id}-${i}`} aria-label={`Position of ${byId[id].name}`} className="input !w-14 text-center" type="number" inputMode="numeric" min="1" max={ids.length}
+              defaultValue={i + 1} onBlur={(e) => e.target.value && move(i, Number(e.target.value) - 1)} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            />
+            <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{byId[id].name}</div>{byId[id].sku && <div className="text-xs text-neutral-400">{byId[id].sku}</div>}</div>
+            <button title="Move up" disabled={i === 0} className="rounded p-2 hover:bg-neutral-100 disabled:opacity-30" onClick={() => move(i, i - 1)}><ArrowUp size={16} /></button>
+            <button title="Move down" disabled={i === ids.length - 1} className="rounded p-2 hover:bg-neutral-100 disabled:opacity-30" onClick={() => move(i, i + 1)}><ArrowDown size={16} /></button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export default function Stock() {
   const { products, runs, uid } = useData();
   const [modal, setModal] = useState(null);
   const [tab, setTab] = useState("stock");
   const [q, setQ] = useState("");
+  const [arranging, setArranging] = useState(false);
   const list = products.filter((p) => (p.name + p.sku).toLowerCase().includes(q.toLowerCase()));
   const van = sum(Object.values(onVehicle(runs)), (v) => v);
 
@@ -249,12 +297,17 @@ export default function Stock() {
             <button key={k} onClick={() => setTab(k)} className={cn("whitespace-nowrap rounded-md px-3 py-1.5", tab === k ? "bg-white shadow-sm" : "text-neutral-500")}>{l}</button>
           ))}
         </div>
-        {tab === "stock" && <input className="input sm:!w-44" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />}
+        {tab === "stock" && !arranging && (
+          <div className="flex gap-2">
+            <button className="btn-ghost shrink-0" onClick={() => { setQ(""); setArranging(true); }}><ListOrdered size={16} />Reorder</button>
+            <input className="input sm:!w-44" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+        )}
       </div>
 
       <div className="card overflow-x-auto">
         {tab === "grn" ? <GrnList /> : tab === "ledger" ? <LedgerView /> : tab === "report" ? <DayReportView /> : tab === "prices" ? <PriceLogView /> : (
-          <StockTable products={list} actions={(p) => (<>
+          arranging ? <ReorderList onDone={() => setArranging(false)} /> : <StockTable products={list} actions={(p) => (<>
             <button title="Adjust stock" className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setModal({ t: "adjust", p })}><SlidersHorizontal size={15} /></button>
             <button title="Edit" className="rounded p-1.5 hover:bg-neutral-100" onClick={() => setModal({ t: "product", p })}><Pencil size={15} /></button>
             <button title="Delete" className="rounded p-1.5 text-red-500 hover:bg-red-50" onClick={() => confirm(`Delete ${p.name}?`) && deleteProduct(uid, p.id)}><Trash2 size={15} /></button>

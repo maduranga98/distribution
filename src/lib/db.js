@@ -28,6 +28,13 @@ export async function deleteProduct(base, id) {
   await deleteDoc(ref(base, "products", id));
 }
 
+/** Save a new product order: ids in the wanted sequence become order 0..n-1. */
+export async function saveProductOrder(base, ids) {
+  const batch = writeBatch(db);
+  ids.forEach((id, i) => batch.update(ref(base, "products", id), { order: i }));
+  await batch.commit();
+}
+
 /** New product, with an "Opening stock" ledger row and the first price-history entry. */
 export async function createProduct(base, data) {
   const pRef = doc(col(base, "products"));
