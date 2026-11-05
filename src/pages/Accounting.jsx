@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { useBusiness } from "../context/BusinessContext";
 import { useData } from "../context/DataContext";
 import { stockValue, summarize } from "../lib/accounts";
-import { monthStart, money, today } from "../lib/utils";
+import { monthStart, money, num, today } from "../lib/utils";
 import { PageHeader, Stat } from "../components/ui";
 
 const Row = ({ label, value, bold, indent }) => (
@@ -12,6 +13,8 @@ const Row = ({ label, value, bold, indent }) => (
 
 export default function Accounting() {
   const d = useData();
+  const { current, update } = useBusiness();
+  const [m, setM] = useState(String(d.margin));
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const s = summarize(d, from, to);
@@ -26,6 +29,18 @@ export default function Accounting() {
         <span className="text-neutral-400">→</span>
         <input type="date" className="input !w-40" value={to} onChange={(e) => setTo(e.target.value)} />
       </PageHeader>
+
+      <div className="card mb-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">Profit margin</p>
+          <p className="text-xs text-neutral-400">% of retail sales for {current.name}. Cost of goods = retail sales − margin.</p>
+        </div>
+        <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); update(current.id, current.name, num(m)); }}>
+          <input className="input !w-24 text-right" type="number" step="any" min="0" max="100" required value={m} onChange={(e) => setM(e.target.value)} />
+          <span className="text-sm text-neutral-500">%</span>
+          <button className="btn-primary" disabled={num(m) === d.margin}>Save</button>
+        </form>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card divide-y divide-neutral-100">
