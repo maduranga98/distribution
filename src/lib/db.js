@@ -150,7 +150,7 @@ export async function cancelLoading(base, run) {
 }
 
 /**
- * Evening unloading (also used to edit one). lines[productId] = { returned, marketReturn }.
+ * Evening unloading (also used to edit one). lines[productId] = { returned, marketReturn, free }.
  * Leftover goes back to the warehouse; sold = loaded − returned; market returns reduce the sale value.
  * extra = { meterEnd, expenses: [{category, amount, note}], collection: {credit, cheques, oldCash, oldCheque, cashCounted} }.
  * The day's expenses are also written to the expenses collection (linked by runId) so Accounts stay correct;
@@ -192,7 +192,7 @@ export async function saveUnloading(base, runId, lines, extra = {}) {
     tx.update(runRef, {
       status: "unloaded",
       items: calc.rows.map(({ error, ...r }) => r),
-      totals: { loaded: calc.loaded, sold: calc.sold, gross: calc.gross, marketValue: calc.marketValue, sales: calc.sales, cost: calc.cost },
+      totals: { loaded: calc.loaded, sold: calc.sold, free: calc.free, freeValue: calc.freeValue, gross: calc.gross, marketValue: calc.marketValue, sales: calc.sales, cost: calc.cost },
       meterEnd, distance, dayExpenses, expenseIds, collection: cash,
       unloadedAt: serverTimestamp(),
     });

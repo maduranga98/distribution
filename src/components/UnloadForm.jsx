@@ -24,9 +24,9 @@ const Section = ({ title, children }) => (
  * Everything is saved together; saving again edits it.
  */
 export default function UnloadForm({ run, onClose }) {
-  const { uid } = useData();
+  const { uid, products } = useData();
   const c = run.collection || {};
-  const [v, setV] = useState(() => Object.fromEntries(run.items.map((i) => [i.productId, { returned: str(i.returned), marketReturn: str(i.marketReturn) }])));
+  const [v, setV] = useState(() => Object.fromEntries(run.items.map((i) => [i.productId, { returned: str(i.returned), marketReturn: str(i.marketReturn), free: str(i.free) }])));
   const [meterEnd, setMeterEnd] = useState(run.meterEnd ?? "");
   const [exp, setExp] = useState(() => (run.dayExpenses?.length ? run.dayExpenses.map((e) => ({ ...e, amount: String(e.amount) })) : []));
   const [cash, setCash] = useState({
@@ -41,6 +41,7 @@ export default function UnloadForm({ run, onClose }) {
   const money$ = calcCash(calc.sales, cash, expTotal);
   const distance = calcDistance(run.meterStart, meterEnd);
   const meterBad = distance != null && distance < 0;
+  const guide = (r) => { const n = products.find((p) => p.id === r.productId)?.freeEvery; return n > 0 && r.sold > 0 ? Math.floor(r.sold / n) : 0; };
   const set = (id, k, val) => setV({ ...v, [id]: { ...v[id], [k]: val } });
   const setC = (k) => (e) => setCash({ ...cash, [k]: e.target.value });
   const setE = (i, k, val) => setExp(exp.map((x, j) => (j === i ? { ...x, [k]: val } : x)));
@@ -54,7 +55,7 @@ export default function UnloadForm({ run, onClose }) {
     try {
       await saveUnloading(
         uid, run.id,
-        Object.fromEntries(Object.entries(v).map(([id, x]) => [id, { returned: num(x.returned), marketReturn: num(x.marketReturn) }])),
+        Object.fromEntries(Object.entries(v).map(([id, x]) => [id, { returned: num(x.returned), marketReturn: num(x.marketReturn), free: num(x.free) }])),
         { meterEnd, expenses: exp, collection: cash }
       );
       onClose();
@@ -78,11 +79,11 @@ export default function UnloadForm({ run, onClose }) {
 
         <Section title="Items">
           <div className="-mx-1 overflow-x-auto">
-            <table className="w-full min-w-[720px]">
+            <table className="w-full min-w-[820px]">
               <thead><tr>
                 <th className="th !px-2">Item</th><th className="th !px-2 text-right">Price / pc</th><th className="th !px-2 text-right">Loaded</th>
                 <th className="th !px-1 text-right">Unloaded</th><th className="th !px-2 text-right">Sold</th>
-                <th className="th !px-1 text-right">Market return</th><th className="th !px-2 text-right">Net</th>
+                <th className="th !px-1 text-right">Free issue</th><th className="th !px-1 text-right">Market return</th><th className="th !px-2 text-right">Net</th>
               </tr></thead>
               <tbody className="divide-y divide-neutral-100">
                 {calc.rows.map((r) => (
@@ -92,6 +93,10 @@ export default function UnloadForm({ run, onClose }) {
                     <td className="td !px-2 !py-1.5 text-right text-neutral-500">{fmtQty(r.loaded, r.caseSize, r.unit)}</td>
                     <td className="!px-1 !py-1.5"><QtyInput caseSize={r.caseSize} value={v[r.productId].returned} onChange={(x) => set(r.productId, "returned", x)} /></td>
                     <td className={cn("td !px-2 !py-1.5 text-right font-medium", r.error && "text-red-600")}>{fmtQty(r.sold, r.caseSize, r.unit)}</td>
+                    <td className="!px-1 !py-1.5">
+                      <QtyInput caseSize={r.caseSize} value={v[r.productId].free} onChange={(x) => set(r.productId, "free", x)} />
+                      {guide(r) > 0 && <p className={cn("mt-0.5 text-right text-[10px]", r.free > guide(r) ? "text-amber-600" : "text-neutral-400")}>guide {guide(r)} pcs</p>}
+                    </td>
                     <td className="!px-1 !py-1.5"><QtyInput caseSize={r.caseSize} value={v[r.productId].marketReturn} onChange={(x) => set(r.productId, "marketReturn", x)} /></td>
                     <td className="td !px-2 !py-1.5 text-right">{money(r.sales)}</td>
                   </tr>
@@ -99,7 +104,7 @@ export default function UnloadForm({ run, onClose }) {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-neutral-400">Sold = Loaded − Unloaded (unloaded goes back to the warehouse). Market return = goods taken back from shops; valued at the retail price and deducted from sales (not restocked).</p>
+          <p className="text-xs text-neutral-400">Sold = Loaded − Unloaded (unloaded goes back to the warehouse). Free issues are part of sold but are not paid for, so they are left out of the sale value. Market return = goods taken back from shops; valued at the retail price and deducted from sales (not restocked).</p>
         </Section>
 
         <Section title="Expenses today">
@@ -128,6 +133,7 @@ export default function UnloadForm({ run, onClose }) {
           </div>
           <div className="rounded-lg bg-neutral-50 p-3">
             <Line label="Sale value" value={money(calc.gross)} />
+            {calc.freeValue > 0 && <Line label={`Free issues given (${money(calc.freeValue)}, not in sale value)`} value="" />}
             <Line label="Less market returns" value={`−${money(calc.marketValue)}`} />
             <Line label="Net sales" value={money(calc.sales)} />
             <Line label="Less credit given" value={`−${money(money$.credit)}`} />

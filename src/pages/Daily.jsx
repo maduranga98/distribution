@@ -147,7 +147,7 @@ function RunCard({ run, onEdit, onUnload }) {
           </div>
           <p className="mt-0.5 text-xs text-neutral-500">
             {run.items.length} items · {sum(run.items, (i) => i.loaded)} pcs loaded
-            {done && ` · sold ${run.totals.sold} pcs · market returns ${money(run.totals.marketValue)} · net sale ${money(run.totals.sales)}`}
+            {done && ` · sold ${run.totals.sold} pcs${run.totals.free ? ` (${run.totals.free} free)` : ""} · market returns ${money(run.totals.marketValue)} · net sale ${money(run.totals.sales)}`}
             {run.meterStart != null && ` · meter ${run.meterStart}${run.meterEnd != null ? ` → ${run.meterEnd}${run.distance != null ? ` (${+run.distance.toFixed(1)} km)` : ""}` : ""}`}
           </p>
           {done && run.collection && (
@@ -171,13 +171,13 @@ function RunCard({ run, onEdit, onUnload }) {
           <table className="w-full">
             <thead><tr>
               <th className="th">Item</th><th className="th text-right">Price / pc</th><th className="th text-right">Loaded</th>
-              {done && <><th className="th text-right">Unloaded</th><th className="th text-right">Sold</th><th className="th text-right">Mkt return</th><th className="th text-right">Net</th></>}
+              {done && <><th className="th text-right">Unloaded</th><th className="th text-right">Sold</th><th className="th text-right">Free</th><th className="th text-right">Mkt return</th><th className="th text-right">Net</th></>}
             </tr></thead>
             <tbody className="divide-y divide-neutral-100">
               {run.items.map((i) => (
                 <tr key={i.productId}>
                   <td className="td">{i.name}</td><td className="td text-right">{money(i.price)}</td><td className="td text-right">{fmtQty(i.loaded, i.caseSize, i.unit)}</td>
-                  {done && <><td className="td text-right">{fmtQty(i.returned || 0, i.caseSize, i.unit)}</td><td className="td text-right">{fmtQty(i.sold, i.caseSize, i.unit)}</td><td className="td text-right">{fmtQty(i.marketReturn || 0, i.caseSize, i.unit)}</td><td className="td text-right">{money(i.sales)}</td></>}
+                  {done && <><td className="td text-right">{fmtQty(i.returned || 0, i.caseSize, i.unit)}</td><td className="td text-right">{fmtQty(i.sold, i.caseSize, i.unit)}</td><td className="td text-right">{i.free ? fmtQty(i.free, i.caseSize, i.unit) : "—"}</td><td className="td text-right">{fmtQty(i.marketReturn || 0, i.caseSize, i.unit)}</td><td className="td text-right">{money(i.sales)}</td></>}
                 </tr>
               ))}
             </tbody>

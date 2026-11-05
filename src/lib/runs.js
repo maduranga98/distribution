@@ -3,18 +3,19 @@ import { num } from "./utils";
 /**
  * Per-item maths for one loading/unloading.
  *   sold   = loaded − unloaded (what came back on the vehicle)
- *   gross  = sold × retail price
+ *   free   = pieces given free (part of sold, not paid for; valued at retail price for information)
+ *   gross  = (sold − free) × retail price
  *   net    = gross − (market returns × retail price)
  */
 export function calcLine(l) {
-  const loaded = num(l.loaded), returned = num(l.returned), mr = num(l.marketReturn);
+  const loaded = num(l.loaded), returned = num(l.returned), mr = num(l.marketReturn), free = num(l.free);
   const price = num(l.price);
-  const sold = loaded - returned;
-  const gross = sold * price;
+  const sold = loaded - returned; // pieces that left the vehicle, free issues included
+  const gross = (sold - free) * price; // only paid pieces earn sale value
   const marketValue = mr * price;
   return {
-    sold, gross, marketValue, sales: gross - marketValue, cost: sold * num(l.cost),
-    error: returned < 0 || mr < 0 ? "Negative quantity" : sold < 0 ? `Unloaded more than loaded (${l.name})` : "",
+    sold, free, freeValue: free * price, gross, marketValue, sales: gross - marketValue, cost: sold * num(l.cost),
+    error: returned < 0 || mr < 0 || free < 0 ? "Negative quantity" : sold < 0 ? `Unloaded more than loaded (${l.name})` : free > sold ? `Free issues more than sold (${l.name})` : "",
   };
 }
 
@@ -22,7 +23,7 @@ export function calcRun(lines) {
   const rows = lines.map((l) => ({ ...l, ...calcLine(l) }));
   const t = (k) => rows.reduce((s, r) => s + r[k], 0);
   return {
-    rows, loaded: t("loaded"), sold: t("sold"), gross: t("gross"), marketValue: t("marketValue"),
+    rows, loaded: t("loaded"), sold: t("sold"), free: t("free"), freeValue: t("freeValue"), gross: t("gross"), marketValue: t("marketValue"),
     sales: t("sales"), cost: t("cost"), error: rows.find((r) => r.error)?.error || "",
   };
 }

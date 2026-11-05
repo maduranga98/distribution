@@ -9,6 +9,10 @@ Loading also records the opening vehicle meter; unloading records the closing me
 item performance, market returns, the cash / cheques / credit / returns split of the sale value, and route & trip distance for any date range.
 Sold qty = loaded − unloaded; net sale = sold × price − market returns × price. Current stock shows warehouse, on-vehicle and total.
 
+**Inventory** also has a *Ledger* (every add/release with on-hand before and after), a *Day stock report* (opening, loaded, after loading, returned, closing per item per route, with a batch id per loading) and *Price history*.
+**Free issues** are entered at unloading (per-item guide: 1 free per N pcs sold). They are part of sold qty but not paid for, so sale value = (sold − free) × price; their value is shown for information and is not deducted from profit.
+**Analytics** also has a *Cash log*, *Month summary* and a 12-month *Year tracker*.
+
 ## Setup
 1. Create a Firebase project; enable **Firestore** (no login is used).
 2. Add a web app and copy its config into `.env` (see `.env.example`).
@@ -23,5 +27,5 @@ npm run build && firebase deploy --only hosting,firestore
 
 ## Data model
 Each business lives under `users/owner/businesses/{businessId}/…`: `products` (stock, cost, price, priceHistory), `grns`,
-`routes`, `runs` (a loading and, once unloaded, its unloading + totals), `expenses` (unloading expenses are written here too, linked by `runId`), `movements` (manual adjustments).
+`routes`, `runs` (a loading and, once unloaded, its unloading + totals), `ledger` and `priceLog` (written with every stock / price change), `expenses` (unloading expenses are written here too, linked by `runId`), `movements` (manual adjustments).
 `firestore.rules` is open to that path (no login). Loadings snapshot price and cost per item, so history stays correct when prices change.

@@ -5,8 +5,9 @@ import { analyze } from "../lib/analytics";
 import { cn, fmtQty, monthStart, money, today } from "../lib/utils";
 import { Bar, Donut } from "../components/charts";
 import { Badge, Empty, PageHeader, Stat } from "../components/ui";
+import { CashLog, MonthSummary, YearTracker } from "./Reports";
 
-const TABS = [["overview", "Overview"], ["items", "Items"], ["returns", "Market returns"], ["routes", "Routes & trips"]];
+const TABS = [["overview", "Overview"], ["items", "Items"], ["returns", "Market returns"], ["routes", "Routes & trips"], ["cash", "Cash log"], ["month", "Month summary"], ["year", "Year tracker"]];
 const SORTS = { net: "Net sales", sold: "Pieces sold", sellThrough: "Sell-through", returnRate: "Return rate" };
 const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 const km = (n) => (n == null ? "—" : `${+n.toFixed(1)} km`);
@@ -22,9 +23,10 @@ function Overview({ a }) {
   const max = Math.max(...a.days.map((d) => d.net), 1);
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Stat label="Net sales" value={money(a.net)} hint={`${a.runCount} unloaded runs`} />
         <Stat label="Market returns" value={money(a.marketValue)} hint={`${pct(a.returnRate)} of sale value`} tone={a.marketValue ? "bad" : undefined} />
+        <Stat label="Free issues" value={money(a.freeValue)} hint="at list price, info only" />
         <Stat label="Expenses" value={money(a.expenses)} hint={a.net ? `${pct((a.expenses / a.net) * 100)} of net sales` : undefined} />
         <Stat label="Cash short / excess" value={`${a.difference > 0 ? "+" : ""}${money(a.difference)}`} tone={a.difference < 0 ? "bad" : a.difference > 0 ? "good" : undefined} hint={`${a.counted} counted days`} />
       </div>
@@ -82,10 +84,10 @@ function Items({ a }) {
       </div>
       {list.length === 0 ? <Empty><BarChart3 className="mx-auto mb-2" />No data in this period</Empty> : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px]">
+          <table className="w-full min-w-[800px]">
             <thead><tr>
               <th className="th">Item</th><th className="th text-right">Loaded</th><th className="th text-right">Sold</th>
-              <th className="th text-right">Sell-through</th><th className="th text-right">Mkt returns</th><th className="th text-right">Net sales</th><th className="th w-28">Share</th>
+              <th className="th text-right">Sell-through</th><th className="th text-right">Free</th><th className="th text-right">Mkt returns</th><th className="th text-right">Net sales</th><th className="th w-28">Share</th>
             </tr></thead>
             <tbody className="divide-y divide-neutral-100">
               {list.map((i) => (
@@ -94,6 +96,7 @@ function Items({ a }) {
                   <td className="td text-right text-neutral-500">{fmtQty(i.loaded, i.caseSize, i.unit)}</td>
                   <td className="td text-right">{fmtQty(i.sold, i.caseSize, i.unit)}</td>
                   <td className="td text-right"><Badge tone={i.sellThrough >= 90 ? "green" : i.sellThrough >= 70 ? "gray" : "amber"}>{pct(i.sellThrough)}</Badge></td>
+                  <td className="td text-right text-neutral-500">{i.free ? fmtQty(i.free, i.caseSize, i.unit) : "—"}</td>
                   <td className="td text-right">{i.marketQty ? <span className="text-red-600">{fmtQty(i.marketQty, i.caseSize, i.unit)} · {pct(i.returnRate)}</span> : <span className="text-neutral-300">—</span>}</td>
                   <td className="td text-right font-medium">{money(i.net)}</td>
                   <td className="td"><Bar pct={i.share} /></td>
@@ -207,22 +210,25 @@ export default function Analytics() {
   const [tab, setTab] = useState("overview");
   const a = useMemo(() => analyze(d, from, to), [d.runs, from, to]);
   const View = { overview: Overview, items: Items, returns: Returns, routes: Routes }[tab];
+  const own = ["cash", "month", "year"].includes(tab); // these tabs pick their own month / year
 
   return (
     <>
       <PageHeader title="Analytics" subtitle="Performance from unloaded runs">
+        {!own && <>
         <button className="btn-ghost" onClick={() => { setFrom(monthStart()); setTo(today()); }}>This month</button>
         <button className="btn-ghost" onClick={() => { const [f, t] = lastMonth(); setFrom(f); setTo(t); }}>Last month</button>
         <input type="date" className="input !w-36" value={from} onChange={(e) => setFrom(e.target.value || monthStart())} />
         <span className="text-neutral-400">→</span>
         <input type="date" className="input !w-36" value={to} onChange={(e) => setTo(e.target.value || today())} />
+        </>}
       </PageHeader>
       <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg bg-neutral-100 p-1">
         {TABS.map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={cn("flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition", tab === k ? "bg-white shadow-sm" : "text-neutral-500 hover:text-neutral-900")}>{l}</button>
         ))}
       </div>
-      <View a={a} />
+      {tab === "cash" ? <CashLog /> : tab === "month" ? <MonthSummary /> : tab === "year" ? <YearTracker /> : <View a={a} />}
     </>
   );
 }

@@ -32,8 +32,8 @@ export function analyze({ runs }, from, to) {
     trips.push({ id: r.id, date: r.date, route: r.routeName, start: r.meterStart, end: r.meterEnd, km: r.distance, net: t.sales || 0, expenses: c?.expenses || 0, difference: c?.difference ?? null });
 
     for (const i of r.items) {
-      const it = bump(items, i.productId, () => ({ id: i.productId, name: i.name, caseSize: i.caseSize, unit: i.unit, loaded: 0, sold: 0, returnedQty: 0, marketQty: 0, gross: 0, marketValue: 0, net: 0, runs: 0 }));
-      it.loaded += i.loaded || 0; it.sold += i.sold || 0; it.returnedQty += i.returned || 0; it.marketQty += i.marketReturn || 0;
+      const it = bump(items, i.productId, () => ({ id: i.productId, name: i.name, caseSize: i.caseSize, unit: i.unit, loaded: 0, sold: 0, returnedQty: 0, marketQty: 0, free: 0, freeValue: 0, gross: 0, marketValue: 0, net: 0, runs: 0 }));
+      it.loaded += i.loaded || 0; it.sold += i.sold || 0; it.returnedQty += i.returned || 0; it.marketQty += i.marketReturn || 0; it.free += i.free || 0; it.freeValue += i.freeValue || 0;
       it.gross += i.gross || 0; it.marketValue += i.marketValue || 0; it.net += i.sales || 0; it.runs++;
       if (i.marketReturn > 0) returns.push({ key: `${r.id}-${i.productId}`, date: r.date, route: r.routeName, name: i.name, caseSize: i.caseSize, unit: i.unit, qty: i.marketReturn, value: i.marketValue || 0 });
     }
@@ -61,6 +61,7 @@ export function analyze({ runs }, from, to) {
     days: Object.values(days).sort((a, b) => a.date.localeCompare(b.date)),
     returns: returns.sort((a, b) => b.date.localeCompare(a.date) || b.value - a.value),
     trips: trips.sort((a, b) => b.date.localeCompare(a.date)),
+    freeValue: sum(rs, (r) => r.totals?.freeValue || 0),
     returnRate: pct(marketValue, gross),
     perKm: distance > 0 ? net / distance : null,
   };
