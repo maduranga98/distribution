@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { ArrowDown, ArrowUp, ClipboardList, ListOrdered, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowDown, ArrowUp, ClipboardList, ListOrdered, ArrowRightLeft, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { LedgerView, DayReportView, PriceLogView } from "../components/StockViews";
+import { useBusiness } from "../context/BusinessContext";
 import { useData } from "../context/DataContext";
-import { adjustStock, createGrn, createProduct, deleteGrn, deleteProduct, saveProduct, saveProductOrder } from "../lib/db";
+import { adjustStock, createGrn, createProduct, deleteGrn, deleteProduct, listProducts, matchProduct, saveProduct, saveProductOrder, transferStock } from "../lib/db";
 import { onVehicle, stockValue } from "../lib/accounts";
-import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
+import { OWNER, cn, fmtQty, money, num, sum, today } from "../lib/utils";
 import { Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
 import StockTable from "../components/StockTable";
 import QtyInput from "../components/QtyInput";
@@ -55,7 +56,7 @@ function ProductForm({ product, onClose }) {
   );
 }
 
-/** Add or release stock (damage, count correction, opening balance…). Shows in the Ledger. */
+/** Add, release or set stock to a counted total (damage, count correction, opening balance…). Shows in the Ledger. */
 function StockEntryForm({ product, onClose }) {
   const { uid, products } = useData();
   const [pid, setPid] = useState(product?.id || "");
@@ -69,18 +70,21 @@ function StockEntryForm({ product, onClose }) {
   const [busy, setBusy] = useState(false);
   const save = async (e) => {
     e.preventDefault();
-    if (!p || !num(qty)) return setError("Pick an item and enter a quantity");
+    if (!p || (sign !== 0 && !num(qty))) return setError("Pick an item and enter a quantity");
+    if (sign === 0 && qty === "") return setError("Enter the counted quantity");
+    const delta = sign === 0 ? num(qty) - p.stock : sign * num(qty);
+    if (!delta) return setError("Counted quantity matches the current stock");
     setBusy(true); setError("");
     try {
-      await adjustStock(uid, { productId: p.id, qty: sign * num(qty), date, unitCost: num(cost), note: note.trim() });
+      await adjustStock(uid, { productId: p.id, qty: delta, date, unitCost: num(cost), note: note.trim() || (sign === 0 ? "Stock count" : "") });
       onClose();
     } catch (err) { setError(err.message); setBusy(false); }
   };
   return (
     <Modal title="Stock entry" onClose={onClose}>
       <form onSubmit={save} className="space-y-3">
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1 text-sm">
-          {[[1, "Add"], [-1, "Release"]].map(([k, l]) => (
+        <div className="grid grid-cols-3 gap-1 rounded-lg bg-neutral-100 p-1 text-sm">
+          {[[1, "Add"], [-1, "Release"], [0, "Set count"]].map(([k, l]) => (
             <button type="button" key={k} onClick={() => setSign(k)} className={cn("rounded-md py-1.5", sign === k ? "bg-white shadow-sm" : "text-neutral-500")}>{l}</button>
           ))}
         </div>
@@ -93,10 +97,92 @@ function StockEntryForm({ product, onClose }) {
             <option value="">Select item…</option>{products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
           </select>
         </Field>
-        <Field label={p ? `Quantity · in stock ${fmtQty(p.stock, p.caseSize, p.unit)}` : "Quantity"}><QtyInput caseSize={p?.caseSize} value={qty} onChange={setQty} /></Field>
+        <Field label={`${sign === 0 ? "Counted quantity" : "Quantity"}${p ? ` · in stock ${fmtQty(p.stock, p.caseSize, p.unit)}` : ""}`}><QtyInput caseSize={p?.caseSize} value={qty} onChange={setQty} /></Field>
+        {sign === 0 && p && qty !== "" && <p className="text-xs text-neutral-500">Change: {num(qty) - p.stock > 0 ? "+" : ""}{fmtQty(num(qty) - p.stock, p.caseSize, p.unit)}</p>}
         <Field label="Note"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Opening stock, damaged, count correction…" /></Field>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button className="btn-primary w-full" disabled={busy}>Save stock entry</button>
+      </form>
+    </Modal>
+  );
+}
+
+/** Send items from this business to another one. Appears in both ledgers. */
+function TransferForm({ onClose }) {
+  const { uid, products } = useData();
+  const { list, current } = useBusiness();
+  const others = (list || []).filter((b) => b.id !== current.id);
+  const [toId, setToId] = useState(others[0]?.id || "");
+  const [dest, setDest] = useState(null); // destination products, null while loading
+  const [date, setDate] = useState(today());
+  const [note, setNote] = useState("");
+  const [lines, setLines] = useState([{ productId: "", qty: "" }]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const to = others.find((b) => b.id === toId);
+  const prod = (id) => products.find((p) => p.id === id);
+  const setLine = (i, patch) => setLines(lines.map((l, k) => (k === i ? { ...l, ...patch } : l)));
+  const valid = lines.filter((l) => l.productId && num(l.qty) > 0);
+
+  useEffect(() => {
+    if (!toId) return;
+    let live = true;
+    setDest(null);
+    listProducts(`${OWNER}/businesses/${toId}`).then((d) => live && setDest(d)).catch(() => live && setDest([]));
+    return () => { live = false; };
+  }, [toId]);
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (!to) return setError("Pick a destination business");
+    if (!valid.length) return setError("Add at least one item with a quantity");
+    if (new Set(valid.map((l) => l.productId)).size !== valid.length) return setError("An item appears twice");
+    const over = valid.find((l) => num(l.qty) > prod(l.productId).stock);
+    if (over) return setError(`Only ${prod(over.productId).stock} of "${prod(over.productId).name}" in stock`);
+    setBusy(true); setError("");
+    try {
+      await transferStock(uid, `${OWNER}/businesses/${to.id}`, {
+        date, note: note.trim(), fromName: current.name, toName: to.name,
+        items: valid.map((l) => ({ productId: l.productId, qty: num(l.qty) })),
+      });
+      onClose();
+    } catch (err) { setError(err.message); setBusy(false); }
+  };
+
+  if (!others.length) return (
+    <Modal title="Transfer stock" onClose={onClose}><p className="text-sm text-neutral-500">Create another business first (business menu → New business), then you can move stock between them.</p></Modal>
+  );
+  return (
+    <Modal title="Transfer stock" onClose={onClose} wide>
+      <form onSubmit={save} className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="From"><div className="input bg-neutral-50 text-neutral-500">{current.name}</div></Field>
+          <Field label="To"><select className="input" value={toId} onChange={(e) => setToId(e.target.value)}>{others.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></Field>
+          <Field label="Date"><input type="date" className="input" required value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+        </div>
+        <div className="space-y-3">
+          {lines.map((l, i) => {
+            const p = prod(l.productId), m = p && dest ? matchProduct(dest, p) : null;
+            return (
+              <div key={i} className="grid grid-cols-12 items-center gap-2 rounded-lg border border-neutral-200 p-2.5">
+                <select className="input col-span-11 sm:col-span-6" value={l.productId} onChange={(e) => setLine(i, { productId: e.target.value })}>
+                  <option value="">Select item…</option>{products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+                <button type="button" className="col-span-1 justify-self-end rounded p-1.5 text-neutral-400 hover:bg-neutral-100 sm:order-last"
+                  onClick={() => setLines(lines.length > 1 ? lines.filter((_, k) => k !== i) : [{ productId: "", qty: "" }])}><X size={16} /></button>
+                <div className="col-span-12 sm:col-span-5"><QtyInput caseSize={p?.caseSize} value={l.qty} onChange={(v) => setLine(i, { qty: v })} /></div>
+                {p && <p className="col-span-12 text-xs text-neutral-500">
+                  Available {fmtQty(p.stock, p.caseSize, p.unit)} · {dest === null ? "checking destination…" : m ? `${to.name} has ${fmtQty(m.stock, m.caseSize, m.unit)}` : `new item in ${to.name}`}
+                </p>}
+              </div>
+            );
+          })}
+          <button type="button" className="text-sm text-neutral-500 hover:text-brand" onClick={() => setLines([...lines, { productId: "", qty: "" }])}>+ Add item</button>
+        </div>
+        <Field label="Note"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" /></Field>
+        <p className="text-xs text-neutral-400">Items are matched in {to?.name} by SKU, then name; missing ones are created there with the same prices.</p>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button className="btn-primary w-full" disabled={busy || dest === null}>Transfer {valid.length ? `${valid.length} item${valid.length > 1 ? "s" : ""}` : ""}</button>
       </form>
     </Modal>
   );
@@ -289,6 +375,7 @@ export default function Stock() {
       <PageHeader title="Inventory" subtitle="Stock, goods received and prices">
         <button className="btn-ghost" onClick={() => setModal({ t: "product" })}><Plus size={16} />Product</button>
         <button className="btn-ghost" onClick={() => setModal({ t: "adjust" })}><SlidersHorizontal size={16} />Stock entry</button>
+        <button className="btn-ghost" onClick={() => setModal({ t: "transfer" })}><ArrowRightLeft size={16} />Transfer</button>
         <button className="btn-primary" onClick={() => setModal({ t: "grn" })}><ClipboardList size={16} />New GRN</button>
       </PageHeader>
 
@@ -324,6 +411,7 @@ export default function Stock() {
 
       {modal?.t === "product" && <ProductForm product={modal.p} onClose={() => setModal(null)} />}
       {modal?.t === "adjust" && <StockEntryForm product={modal.p} onClose={() => setModal(null)} />}
+      {modal?.t === "transfer" && <TransferForm onClose={() => setModal(null)} />}
       {modal?.t === "grn" && <GrnForm onClose={() => setModal(null)} />}
     </>
   );

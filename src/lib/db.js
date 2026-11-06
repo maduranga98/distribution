@@ -1,5 +1,5 @@
 import {
-  addDoc, collection, deleteDoc, doc, increment, runTransaction,
+  addDoc, collection, deleteDoc, doc, getDocs, increment, runTransaction,
   serverTimestamp, updateDoc, writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
@@ -70,6 +70,59 @@ export async function adjustStock(base, m) {
     if (after < 0) throw new Error(`Only ${before} in stock`);
     tx.update(pRef, { stock: increment(m.qty) });
     ledgerRow(base, tx, p, { date: m.date, type: m.qty >= 0 ? "Add" : "Release", qty: m.qty, unitCost: m.unitCost, note: m.note, before, after });
+  });
+}
+
+const norm = (s) => String(s || "").trim().toLowerCase();
+
+export const listProducts = async (base) => (await getDocs(col(base, "products"))).docs.map((d) => ({ id: d.id, ...d.data() }));
+
+/** The product in `list` that is the same item as `p`: same SKU, else same name. */
+export const matchProduct = (list, p) =>
+  (norm(p.sku) && list.find((x) => norm(x.sku) === norm(p.sku))) || list.find((x) => norm(x.name) === norm(p.name)) || null;
+
+/**
+ * Move stock from one business to another in a single transaction.
+ * t = { date, note, fromName, toName, items: [{ productId, qty }] }. Items missing in the destination are created there
+ * (same details, no price history). Both ledgers get a row with on-hand before/after.
+ */
+export async function transferStock(fromBase, toBase, t) {
+  if (fromBase === toBase) throw new Error("Pick a different business");
+  const destList = await listProducts(toBase);
+  const orders = destList.map((p) => p.order).filter(Number.isFinite);
+  let nextOrder = orders.length ? Math.max(...orders) + 1 : null;
+  await runTransaction(db, async (tx) => {
+    const srcSnaps = await Promise.all(t.items.map((i) => tx.get(ref(fromBase, "products", i.productId))));
+    const matches = srcSnaps.map((s) => (s.exists() ? matchProduct(destList, s.data()) : null));
+    const ids = matches.filter(Boolean).map((m) => m.id);
+    if (new Set(ids).size !== ids.length) throw new Error("Two items match the same product in the destination");
+    const dstSnaps = await Promise.all(matches.map((m) => (m ? tx.get(ref(toBase, "products", m.id)) : null)));
+    srcSnaps.forEach((s, k) => {
+      const qty = t.items[k].qty;
+      if (!s.exists()) throw new Error("A product no longer exists");
+      const p = { id: s.id, ...s.data() };
+      if (!(qty > 0)) throw new Error(`Enter a quantity for "${p.name}"`);
+      if (p.stock < qty) throw new Error(`Only ${p.stock} of "${p.name}" in stock`);
+      tx.update(s.ref, { stock: increment(-qty) });
+      ledgerRow(fromBase, tx, p, { date: t.date, type: "Release", qty, before: p.stock, after: p.stock - qty, note: `Transfer to ${t.toName}${t.note ? ` · ${t.note}` : ""}` });
+      const note = `Transfer from ${t.fromName}${t.note ? ` · ${t.note}` : ""}`;
+      const d = dstSnaps[k];
+      if (d?.exists()) {
+        const dp = { id: d.id, ...d.data() };
+        tx.update(d.ref, { stock: increment(qty) });
+        ledgerRow(toBase, tx, dp, { date: t.date, type: "Add", qty, unitCost: p.cost, before: dp.stock, after: dp.stock + qty, note });
+      } else {
+        const nRef = doc(col(toBase, "products"));
+        const data = {
+          name: p.name, sku: p.sku || "", category: p.category || "", unit: p.unit || "pcs", caseSize: p.caseSize || 0, cost: p.cost || 0,
+          price: p.price || 0, priceHistory: [], minStock: p.minStock || 0, freeEvery: p.freeEvery || 0, stock: qty, ...(nextOrder != null && { order: nextOrder++ }),
+        };
+        tx.set(nRef, stamp(data));
+        const np = { id: nRef.id, ...data };
+        ledgerRow(toBase, tx, np, { date: t.date, type: "Add", qty, unitCost: p.cost, before: 0, after: qty, note });
+        priceRow(toBase, tx, np, null, data.price, "Transfer");
+      }
+    });
   });
 }
 
