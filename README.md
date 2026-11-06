@@ -9,6 +9,8 @@ Loading also records the opening vehicle meter; unloading records the closing me
 item performance, market returns, the cash / cheques / credit / returns split of the sale value, and route & trip distance for any date range.
 Sold qty = loaded − unloaded; net sale = sold × price − market returns × price. Current stock shows warehouse, on-vehicle and total.
 
+**Stock entry** can add, release, or *set count* (type the counted total; the difference is booked). **Transfer** moves items to another business: a Release in this ledger and an Add in the other, in one transaction; the destination item is matched by SKU, then name, and created if missing.
+
 **Inventory** also has a *Ledger* (every add/release with on-hand before and after), a *Day stock report* (opening, loaded, after loading, returned, closing per item per route, with a batch id per loading) and *Price history*.
 **Free issues** are entered at unloading (per-item guide: 1 free per N pcs sold). They are part of sold qty but not paid for, so sale value = (sold − free) × price; their value is shown for information and is not deducted from profit.
 **Analytics** also has a *Cash log*, *Month summary* and a 12-month *Year tracker*.
