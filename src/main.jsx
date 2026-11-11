@@ -39,6 +39,12 @@ function Shell() {
   );
 }
 
+// Scrolling over a focused number box changes its value in most browsers. Drop focus instead, so the page just scrolls.
+document.addEventListener("wheel", () => {
+  const el = document.activeElement;
+  if (el?.tagName === "INPUT" && el.type === "number") el.blur();
+}, { passive: true, capture: true });
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
