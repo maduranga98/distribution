@@ -62,7 +62,7 @@ export function DayReportView() {
   const rows = useMemo(() => runs.filter((r) => r.date >= f.from && r.date <= f.to).sort((a, b) => b.date.localeCompare(a.date) || (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
     .flatMap((r) => r.items.filter((i) => !f.item || i.productId === f.item).map((i) => {
       const hasOpen = i.opening != null, done = r.status !== "loaded";
-      const after = hasOpen ? i.opening - i.loaded : null, closing = done && after != null ? after + (i.returned || 0) : null;
+      const after = hasOpen ? i.opening - i.loaded : null, closing = !done ? null : i.closing ?? (after != null ? after + (i.returned || 0) : null); // saved at unloading; older runs are estimated
       return { key: `${r.id}-${i.productId}`, date: r.date, route: r.routeName, visit: r.visit, batch: r.batchId, i, after, closing, done, opening: i.opening };
     })), [runs, f.from, f.to, f.item]);
   return (

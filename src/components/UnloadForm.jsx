@@ -36,7 +36,9 @@ export default function UnloadForm({ run, onClose }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const calc = calcRun(run.items.map((i) => ({ ...i, ...v[i.productId] })));
+  // cases are counted with the item's current case size, so the boxes agree with the Inventory page
+  const caseOf = (i) => products.find((p) => p.id === i.productId)?.caseSize ?? i.caseSize;
+  const calc = calcRun(run.items.map((i) => ({ ...i, ...v[i.productId], caseSize: caseOf(i) })));
   const expTotal = sum(exp, (e) => num(e.amount));
   const money$ = calcCash(calc.sales, cash, expTotal);
   const distance = calcDistance(run.meterStart, meterEnd);
