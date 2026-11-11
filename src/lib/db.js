@@ -9,6 +9,7 @@ import { batchId, num, today } from "./utils";
 const col = (base, name) => collection(db, `users/${base}/${name}`);
 const ref = (base, name, id) => doc(db, `users/${base}/${name}/${id}`);
 const stamp = (d) => ({ ...d, createdAt: serverTimestamp() });
+const r3 = (n) => Math.round(n * 1000) / 1000;
 
 /** One stock-ledger row. qty is always positive; type says the direction. */
 const ledgerRow = (base, tx, p, e) =>
@@ -222,6 +223,7 @@ export async function saveUnloading(base, runId, lines, extra = {}) {
     const s = await tx.get(runRef);
     if (!s.exists()) throw new Error("Loading not found");
     const run = s.data();
+    const snaps = await Promise.all(run.items.map((i) => tx.get(ref(base, "products", i.productId))));
     const items = run.items.map((i) => ({ ...i, ...lines[i.productId] }));
     const calc = calcRun(items);
     if (calc.error) throw new Error(calc.error);
@@ -237,9 +239,15 @@ export async function saveUnloading(base, runId, lines, extra = {}) {
     const cash = calcCash(calc.sales, extra.collection || {}, expenseTotal);
 
     const wasDone = run.status !== "loaded";
-    run.items.forEach((i) => {
-      const delta = Number(lines[i.productId]?.returned || 0) - (wasDone ? Number(i.returned || 0) : 0);
-      if (delta) tx.update(ref(base, "products", i.productId), { stock: increment(delta) });
+    // warehouse stock right after this unloading, kept per item for the Day Stock Report
+    const closing = {};
+    run.items.forEach((i, k) => {
+      const delta = num(lines[i.productId]?.returned) - (wasDone ? num(i.returned) : 0);
+      const p = snaps[k];
+      if (!p.exists()) return; // product deleted since loading: nothing to restock
+      if (delta) tx.update(p.ref, { stock: increment(delta) });
+      if (!wasDone) closing[i.productId] = r3(num(p.data().stock) + delta);
+      else if (i.closing != null) closing[i.productId] = r3(i.closing + delta);
     });
 
     (run.expenseIds || []).forEach((id) => tx.delete(ref(base, "expenses", id)));
@@ -251,7 +259,7 @@ export async function saveUnloading(base, runId, lines, extra = {}) {
 
     tx.update(runRef, {
       status: "unloaded",
-      items: calc.rows.map(({ error, ...r }) => r),
+      items: calc.rows.map(({ error, closing: _, ...r }) => ({ ...r, ...(closing[r.productId] != null && { closing: closing[r.productId] }) })),
       totals: { loaded: calc.loaded, sold: calc.sold, free: calc.free, freeValue: calc.freeValue, gross: calc.gross, marketValue: calc.marketValue, sales: calc.sales, cost: calc.cost },
       meterEnd, distance, dayExpenses, expenseIds, collection: cash,
       unloadedAt: serverTimestamp(),
