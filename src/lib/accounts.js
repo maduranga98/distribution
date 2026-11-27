@@ -18,7 +18,8 @@ export function summarize({ runs, expenses, grns, margin = DEFAULT_MARGIN }, fro
   };
 }
 
-export const stockValue = (products) => sum(products, (p) => p.stock * p.cost);
+/** Stock value at the selling (retail) price. */
+export const stockValue = (products) => sum(products, (p) => (p.stock || 0) * (p.price || 0));
 
 /** Qty currently on vehicles (loaded, not yet unloaded) per product id. */
 export function onVehicle(runs) {

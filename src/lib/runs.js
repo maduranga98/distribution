@@ -8,7 +8,7 @@ import { num } from "./utils";
  *   net    = gross − (market returns × retail price)
  */
 export function calcLine(l) {
-  const loaded = num(l.loaded), returned = num(l.returned), mr = num(l.marketReturn), free = num(l.free);
+  const loaded = num(l.loaded), returned = num(l.returned), mr = mrQty(l), free = num(l.free);
   const price = num(l.price);
   const sold = loaded - returned; // pieces that left the vehicle, free issues included
   const gross = (sold - free) * price; // only paid pieces earn sale value
@@ -27,6 +27,9 @@ export function calcRun(lines) {
     sales: t("sales"), cost: t("cost"), error: rows.find((r) => r.error)?.error || "",
   };
 }
+
+/** Market-return pieces on a run item. Runs saved before the unloading rework used `marketReturns`. */
+export const mrQty = (i) => num(i.marketReturn ?? i.marketReturns);
 
 export const isDone = (r) => r.status !== "loaded";
 

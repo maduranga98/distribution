@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { saveUnloading } from "../lib/db";
-import { calcCash, calcDistance, calcRun } from "../lib/runs";
-import { cn, fmtQty, money, num, sum } from "../lib/utils";
+import { calcCash, calcDistance, calcRun, mrQty } from "../lib/runs";
+import { cn, fmtPcs, fmtQty, money, num, sum } from "../lib/utils";
 import { CATEGORIES } from "../pages/Expenses";
 import { Field } from "./ui";
 import QtyInput from "./QtyInput";
@@ -26,7 +26,7 @@ const Section = ({ title, children }) => (
 export default function UnloadForm({ run, onClose }) {
   const { uid, products } = useData();
   const c = run.collection || {};
-  const [v, setV] = useState(() => Object.fromEntries(run.items.map((i) => [i.productId, { returned: str(i.returned), marketReturn: str(i.marketReturn), free: str(i.free) }])));
+  const [v, setV] = useState(() => Object.fromEntries(run.items.map((i) => [i.productId, { returned: str(i.returned), marketReturn: str(mrQty(i)), free: str(i.free) }])));
   const [meterEnd, setMeterEnd] = useState(run.meterEnd ?? "");
   const [exp, setExp] = useState(() => (run.dayExpenses?.length ? run.dayExpenses.map((e) => ({ ...e, amount: String(e.amount) })) : []));
   const [cash, setCash] = useState({
@@ -113,7 +113,7 @@ export default function UnloadForm({ run, onClose }) {
                     <td className="td !px-2 !py-1.5 lg:!py-2 text-right text-neutral-500">{money(r.price)}</td>
                     <td className="td !px-2 !py-1.5 lg:!py-2 text-right text-neutral-500">{fmtQty(r.loaded, r.caseSize, r.unit)}</td>
                     <td className="!px-1 !py-1.5 lg:!py-2"><QtyInput caseSize={r.caseSize} value={v[r.productId].returned} onChange={(x) => set(r.productId, "returned", x)} /></td>
-                    <td className={cn("td !px-2 !py-1.5 lg:!py-2 text-right font-medium", r.error && "text-red-600")}>{fmtQty(r.sold, r.caseSize, r.unit)}</td>
+                    <td className={cn("td !px-2 !py-1.5 lg:!py-2 text-right font-medium", r.error && "text-red-600")}>{fmtPcs(r.sold, r.unit)}</td>
                     <td className="!px-1 !py-1.5 lg:!py-2">
                       <QtyInput caseSize={r.caseSize} value={v[r.productId].free} onChange={(x) => set(r.productId, "free", x)} />
                       {guide(r) > 0 && <p className={cn("mt-0.5 text-right text-[10px]", r.free > guide(r) ? "text-amber-600" : "text-neutral-400")}>guide {guide(r)} pcs</p>}
@@ -152,7 +152,7 @@ export default function UnloadForm({ run, onClose }) {
                     <QtyInput caseSize={r.caseSize} value={v[r.productId].marketReturn} onChange={(x) => set(r.productId, "marketReturn", x)} /></div>
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2 text-sm">
-                  <span className={cn(r.error && "text-red-600")}>Sold <b>{fmtQty(r.sold, r.caseSize, r.unit)}</b></span>
+                  <span className={cn(r.error && "text-red-600")}>Sold <b>{fmtPcs(r.sold, r.unit)}</b></span>
                   <span>Net <b>{money(r.sales)}</b></span>
                 </div>
               </div>

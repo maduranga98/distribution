@@ -1,5 +1,5 @@
 import { inRange, sum } from "./utils";
-import { isDone } from "./runs";
+import { isDone, mrQty } from "./runs";
 import { onVehicle } from "./accounts";
 
 const bump = (m, k, init) => (m[k] ||= init());
@@ -8,14 +8,14 @@ export const UNCATEGORISED = "Uncategorised";
 const PALETTE = ["#001948", "#2563eb", "#fd6b01", "#8b5cf6", "#10b981", "#ef4444", "#f59e0b", "#06b6d4", "#ec4899", "#84cc16"];
 
 /**
- * Inventory value (at MRP) per item and per category. Stock on vehicles still counts as inventory.
+ * Inventory value (at selling price) per item and per category. Stock on vehicles still counts as inventory.
  * `category` filters the item list; shares are given against the whole stock and against the category.
  */
 export function inventoryValue({ products, runs }, category = "") {
   const van = onVehicle(runs);
   const all = products.map((p) => {
     const qty = (p.stock || 0) + (van[p.id] || 0);
-    return { id: p.id, name: p.name, sku: p.sku, caseSize: p.caseSize, unit: p.unit, category: p.category || UNCATEGORISED, qty, cost: p.cost || 0, value: qty * (p.cost || 0) };
+    return { id: p.id, name: p.name, sku: p.sku, caseSize: p.caseSize, unit: p.unit, category: p.category || UNCATEGORISED, qty, price: p.price || 0, value: qty * (p.price || 0) };
   });
   const total = sum(all, (i) => i.value);
   const cats = {};
@@ -60,9 +60,10 @@ export function analyze({ runs }, from, to) {
 
     for (const i of r.items) {
       const it = bump(items, i.productId, () => ({ id: i.productId, name: i.name, caseSize: i.caseSize, unit: i.unit, loaded: 0, sold: 0, returnedQty: 0, marketQty: 0, free: 0, freeValue: 0, gross: 0, marketValue: 0, net: 0, runs: 0 }));
-      it.loaded += i.loaded || 0; it.sold += i.sold || 0; it.returnedQty += i.returned || 0; it.marketQty += i.marketReturn || 0; it.free += i.free || 0; it.freeValue += i.freeValue || 0;
-      it.gross += i.gross || 0; it.marketValue += i.marketValue || 0; it.net += i.sales || 0; it.runs++;
-      if (i.marketReturn > 0) returns.push({ key: `${r.id}-${i.productId}`, date: r.date, route: r.routeName, name: i.name, caseSize: i.caseSize, unit: i.unit, qty: i.marketReturn, value: i.marketValue || 0 });
+      const mq = mrQty(i), mv = i.marketValue ?? mq * (i.price || 0);
+      it.loaded += i.loaded || 0; it.sold += i.sold || 0; it.returnedQty += i.returned || 0; it.marketQty += mq; it.free += i.free || 0; it.freeValue += i.freeValue || 0;
+      it.gross += i.gross || 0; it.marketValue += mv; it.net += i.sales || 0; it.runs++;
+      if (mq > 0 || mv > 0) returns.push({ key: `${r.id}-${i.productId}`, date: r.date, route: r.routeName, name: i.name, caseSize: i.caseSize, unit: i.unit, qty: mq, value: mv });
     }
   }
 

@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { Boxes, ChevronDown, FileText, MapPin, PackageCheck, PackageMinus, Pencil, Trash2 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { cancelLoading, saveLoading } from "../lib/db";
-import { cn, fmtQty, money, num, sum, today } from "../lib/utils";
+import { mrQty } from "../lib/runs";
+import { cn, fmtPcs, fmtQty, money, num, sum, today } from "../lib/utils";
 import { Badge, Empty, Field, Modal, PageHeader, Stat } from "../components/ui";
 import StockTable from "../components/StockTable";
 import QtyInput from "../components/QtyInput";
@@ -129,7 +130,7 @@ function RunCard({ run, onEdit, onUnload }) {
               {run.items.map((i) => (
                 <tr key={i.productId}>
                   <td className="td">{i.name}</td><td className="td text-right">{money(i.price)}</td><td className="td text-right">{fmtQty(i.loaded, i.caseSize, i.unit)}</td>
-                  {done && <><td className="td text-right">{fmtQty(i.returned || 0, i.caseSize, i.unit)}</td><td className="td text-right">{fmtQty(i.sold, i.caseSize, i.unit)}</td><td className="td text-right">{i.free ? fmtQty(i.free, i.caseSize, i.unit) : "—"}</td><td className="td text-right">{fmtQty(i.marketReturn || 0, i.caseSize, i.unit)}</td><td className="td text-right">{money(i.sales)}</td></>}
+                  {done && <><td className="td text-right">{fmtQty(i.returned || 0, i.caseSize, i.unit)}</td><td className="td text-right">{fmtPcs(i.sold, i.unit)}</td><td className="td text-right">{i.free ? fmtQty(i.free, i.caseSize, i.unit) : "—"}</td><td className="td text-right">{fmtQty(mrQty(i), i.caseSize, i.unit)}</td><td className="td text-right">{money(i.sales)}</td></>}
                 </tr>
               ))}
             </tbody>

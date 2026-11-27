@@ -65,7 +65,7 @@ export default function Accounting() {
 
       <p className="mb-2 mt-6 text-sm font-medium">Position today</p>
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Stock value (at MRP)" value={money(stockValue(d.products))} />
+        <Stat label="Stock value (at selling price)" value={money(stockValue(d.products))} />
         <Stat label="Loadings in period" value={s.runCount} />
       </div>
     </>

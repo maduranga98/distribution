@@ -21,6 +21,9 @@ export function fmtQty(n, caseSize, unit = "pcs") {
   return sign + parts;
 }
 
+/** Always in pieces, never split into cases (e.g. sold quantities). */
+export const fmtPcs = (n, unit = "pcs") => `${Math.round((Number(n) || 0) * 1000) / 1000} ${unit || "pcs"}`;
+
 /** Default profit margin (% of retail sales) when a business has none set. */
 export const DEFAULT_MARGIN = 6;
 
