@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { BarChart3 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { analyze, inventoryValue } from "../lib/analytics";
-import { cn, fmtQty, monthStart, money, today } from "../lib/utils";
+import { cn, fmtPcs, fmtQty, monthStart, money, today } from "../lib/utils";
 import { Bar, Donut } from "../components/charts";
 import { Badge, Empty, PageHeader, Stat } from "../components/ui";
 import { CashLog, MonthSummary, YearTracker } from "./Reports";
@@ -94,7 +94,7 @@ function Items({ a }) {
                 <tr key={i.id}>
                   <td className="td font-medium">{i.name}</td>
                   <td className="td text-right text-neutral-500">{fmtQty(i.loaded, i.caseSize, i.unit)}</td>
-                  <td className="td text-right">{fmtQty(i.sold, i.caseSize, i.unit)}</td>
+                  <td className="td text-right">{fmtPcs(i.sold, i.unit)}</td>
                   <td className="td text-right"><Badge tone={i.sellThrough >= 90 ? "green" : i.sellThrough >= 70 ? "gray" : "amber"}>{pct(i.sellThrough)}</Badge></td>
                   <td className="td text-right text-neutral-500">{i.free ? fmtQty(i.free, i.caseSize, i.unit) : "—"}</td>
                   <td className="td text-right">{i.marketQty ? <span className="text-red-600">{fmtQty(i.marketQty, i.caseSize, i.unit)} · {pct(i.returnRate)}</span> : <span className="text-neutral-300">—</span>}</td>
@@ -118,14 +118,14 @@ function Inventory() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Stat label="Total stock value (MRP)" value={money(inv.total)} hint={`${d.products.length} items · ${inv.categories.length} categories`} />
+        <Stat label="Total stock value" value={money(inv.total)} hint={`${d.products.length} items · ${inv.categories.length} categories`} />
         <Stat label={cat ? `${cat} value` : "Most valuable category"} value={money(cat ? inv.scopeValue : inv.categories[0]?.value)} hint={cat ? `${pct(inv.total ? (inv.scopeValue / inv.total) * 100 : 0)} of total stock` : inv.categories[0]?.label} />
         <Stat className="col-span-2 sm:col-span-1" label="Most valuable item" value={top ? money(top.value) : "—"} hint={top ? `${top.name} · ${pct(top.shareTotal)} of total` : undefined} />
       </div>
 
       <div className="card p-4">
         <p className="mb-1 text-sm font-medium">Stock value by category</p>
-        <p className="mb-4 text-xs text-neutral-400">Warehouse + vehicle stock at MRP. Use the filter below to drill into a category.</p>
+        <p className="mb-4 text-xs text-neutral-400">Warehouse + vehicle stock at selling price. Use the filter below to drill into a category.</p>
         {inv.categories.length ? <Donut data={inv.categories} center={<><span className="text-[11px] text-neutral-400">Total</span><span className="text-sm font-semibold">{money(inv.total)}</span></>} />
           : <Empty>No products</Empty>}
       </div>
@@ -166,7 +166,7 @@ function Inventory() {
 }
 
 function Returns({ a }) {
-  const byItem = [...a.items].filter((i) => i.marketQty > 0).sort((x, y) => y.marketValue - x.marketValue);
+  const byItem = [...a.items].filter((i) => i.marketQty > 0 || i.marketValue > 0).sort((x, y) => y.marketValue - x.marketValue);
   const byRoute = [...a.routes].filter((r) => r.returns > 0).sort((x, y) => y.returns - x.returns);
   return (
     <div className="space-y-4">
@@ -181,7 +181,7 @@ function Returns({ a }) {
           {byItem.length === 0 ? <Empty>No market returns</Empty> : (
             <table className="w-full"><tbody className="divide-y divide-neutral-100">
               {byItem.map((i) => (
-                <tr key={i.id}><td className="td">{i.name}<div className="mt-1.5"><Bar pct={(i.marketValue / byItem[0].marketValue) * 100} color="#ef4444" /></div></td>
+                <tr key={i.id}><td className="td">{i.name}<div className="mt-1.5"><Bar pct={byItem[0].marketValue > 0 ? (i.marketValue / byItem[0].marketValue) * 100 : 0} color="#ef4444" /></div></td>
                   <td className="td text-right text-neutral-500">{fmtQty(i.marketQty, i.caseSize, i.unit)}<div className="text-xs">{pct(i.returnRate)} of sold</div></td>
                   <td className="td text-right font-medium">{money(i.marketValue)}</td></tr>
               ))}
@@ -193,7 +193,7 @@ function Returns({ a }) {
           {byRoute.length === 0 ? <Empty>No market returns</Empty> : (
             <table className="w-full"><tbody className="divide-y divide-neutral-100">
               {byRoute.map((r) => (
-                <tr key={r.id}><td className="td">{r.name}</td><td className="td text-right text-neutral-500">{pct((r.returns / r.gross) * 100)} of sale</td><td className="td text-right font-medium">{money(r.returns)}</td></tr>
+                <tr key={r.id}><td className="td">{r.name}</td><td className="td text-right text-neutral-500">{pct(r.gross > 0 ? (r.returns / r.gross) * 100 : 0)} of sale</td><td className="td text-right font-medium">{money(r.returns)}</td></tr>
               ))}
             </tbody></table>
           )}

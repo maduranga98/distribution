@@ -382,7 +382,7 @@ export default function Stock() {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Products" value={products.length} />
         <Stat label="On vehicles" value={van} hint="pcs, not yet unloaded" />
-        <Stat className="col-span-2 sm:col-span-1" label="Stock value (MRP)" value={money(stockValue(products))} />
+        <Stat className="col-span-2 sm:col-span-1" label="Stock value" hint="at selling price" value={money(stockValue(products))} />
       </div>
 
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
